@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-11-18
+
+- Antigravity CLI (`agy`): documenta que as skills são chamadas pelo nome ("rode a skill warm-up"), já que o CLI trata `.agents/workflows/` como formato antigo e não cria comandos com `/`.
+
 ## 0.1.0 — 2026-11-18
 
 Primeira versão, derivada do Onion (onion-mini + onion-evolve, pin `7a5bd2ab7ddf`).

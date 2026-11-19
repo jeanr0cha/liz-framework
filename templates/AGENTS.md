@@ -53,7 +53,8 @@ tempo**.
         → /engineer-work → /engineer-pre-pr → /engineer-pr        (/catch-up retoma; "liz" orienta)
 ```
 
-No Codex use `$` no lugar de `/` (ex.: `$engineer-start`).
+No Codex use `$` no lugar de `/` (ex.: `$engineer-start`). No Antigravity CLI (`agy`), se o `/` não
+reconhecer o comando, peça pelo nome: "rode a skill warm-up" ou "faça o engineer-start da tarefa X".
 
 ### Regras
 

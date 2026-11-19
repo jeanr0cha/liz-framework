@@ -57,7 +57,7 @@ Uma recomendação só, não um cardápio.
 | Voltar de uma pausa | `/catch-up` | reconstrói onde vocês pararam |
 
 No Codex os comandos são chamados com `$` (ex.: `$engineer-start`); no Claude Code e no
-Antigravity, com `/`.
+Antigravity IDE, com `/`. No Antigravity CLI (`agy`), peça pelo nome: "rode a skill warm-up".
 
 ## 4. Quem ajuda
 
