@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — 2026-11-25
+
+- README reorganizado: começo rápido, o ciclo e as sessões em poucas linhas, comandos agrupados por etapa
+  com "quando usar", tabela de especialistas, um exemplo de ponta a ponta, gerenciador de tarefas e
+  opções do instalador.
+- `AGENTS.md` do projeto (bloco do Liz): o caminho inclui o `/engineer-spike` e aponta o
+  `@software-architect` para desenho e decisões.
+
 ## 0.2.0 — 2026-11-25
 
 Desenho de software, trazido do Onion (`onion-evolve` até `9d1180926079`).

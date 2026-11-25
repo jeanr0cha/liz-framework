@@ -49,9 +49,11 @@ tempo**.
 ### Caminho
 
 ```
-/warm-up → /product-collect → /product-feature → /engineer-start → /engineer-plan
+/warm-up → /product-collect → /product-feature → /engineer-start → (/engineer-spike) → /engineer-plan
         → /engineer-work → /engineer-pre-pr → /engineer-pr        (/catch-up retoma; "liz" orienta)
 ```
+
+Desenho de arquitetura e decisões (C4, ADR): `@software-architect` e `.agents/knowledge/c4-adr-patterns.md`.
 
 No Codex use `$` no lugar de `/` (ex.: `$engineer-start`). No Antigravity CLI (`agy`), se o `/` não
 reconhecer o comando, peça pelo nome: "rode a skill warm-up" ou "faça o engineer-start da tarefa X".
