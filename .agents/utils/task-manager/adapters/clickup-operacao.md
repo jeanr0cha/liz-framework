@@ -1,7 +1,7 @@
 <!-- adapter-auxiliar: clickup -->
 # 🔧 ClickUp — Operação (exemplos, bulk, hierarquia, checklists, troubleshooting)
 
-> **Irmão de [`clickup.md`](clickup.md) por *progressive disclosure* ([`sdaal.md` §14.5](../../../../docs/sdaal/sdaal.md)).**
+> **Irmão de [`clickup.md`](clickup.md) por *progressive disclosure* (`sdaal.md` §14.5).**
 > O adapter guarda o **contrato e a implementação** — o que uma sessão precisa para CHAMAR certo,
 > inclusive as armadilhas medidas (campos, formatos, status por List). Este arquivo guarda a
 > **operação**: receitas, exemplos trabalhados e diagnóstico.
@@ -149,4 +149,4 @@ function calculateProgress(task) {
 
 - Contrato e implementação: [`clickup.md`](clickup.md)
 - Abstração agnóstica: [`../interface.md`](../interface.md) · tipos: [`../types.md`](../types.md)
-- Padrão-pai: [SDAAL](../../../../docs/sdaal/sdaal.md)
+- Padrão-pai: SDAAL

@@ -1,7 +1,7 @@
 <!-- adapter-auxiliar: clickup -->
 # 🔵 ClickUp — o executável `clickup.py` (2026-11-06)
 
-> **Irmão de [`clickup.md`](clickup.md) por *progressive disclosure* ([`sdaal.md` §14.5](../../../../docs/sdaal/sdaal.md)).**
+> **Irmão de [`clickup.md`](clickup.md) por *progressive disclosure* (`sdaal.md` §14.5).**
 > O adapter guarda o contrato; este arquivo guarda o que o **executável** faz, como ele foi provado e o que
 > **ninguém mediu ainda**. O executável é [`clickup.py`](clickup.py); a declaração,
 > [`clickup.capabilities.tsv`](clickup.capabilities.tsv); a bancada é a família `run_task_manager_clickup_selftests` (só no core: não viaja para as portas sem lint).

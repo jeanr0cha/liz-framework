@@ -107,7 +107,7 @@ determinística, exposta pelo helper `.agents/utils/git/resolve-integration-bran
 
 > Assim um repo adotado com branch de integração própria é respeitado sem depender de config local; o
 > `git config` que o `/meta-adopt` seta é só atalho para o `git flow` nativo. Schema do stamp:
-> [`architecture.md §6.1`](../../meta-specs/architecture.md).
+> `architecture.md §6.1`.
 
 ---
 
@@ -886,7 +886,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Contrato de Sessão de Desenvolvimento
 
-> **Fonte única de verdade (SSOT)** para a estrutura de sessão que os comandos criam ao iniciar trabalho. **Todo** comando, agente, skill ou doc **cita** este contrato em vez de re-descrevê-lo. A mecânica de eficácia de IA (esquema do `STATE.md`, protocolo de leitura escalonado, prompt cache, checkpoint) vive no KB [worklog-protocol.md](../concepts/worklog-protocol.md), que esta seção referencia.
+> **Fonte única de verdade (SSOT)** para a estrutura de sessão que os comandos criam ao iniciar trabalho. **Todo** comando, agente, skill ou doc **cita** este contrato em vez de re-descrevê-lo. A mecânica de eficácia de IA (esquema do `STATE.md`, protocolo de leitura escalonado, prompt cache, checkpoint) vive no KB [worklog-protocol.md](worklog-protocol.md), que esta seção referencia.
 
 ### Terminologia: worklog vs. transcript
 
@@ -895,7 +895,7 @@ Dois conceitos distintos — historicamente ambos chamados "sessão", o que gera
 - **Worklog** = a pasta `.agents/sessions/<slug>/` (estado em **arquivo**, durável; sobrevive a `/clear` e a troca de máquina). É o que este contrato define.
 - **Transcript** = a conversa **nativa** do Claude Code (`claude --resume`/`-c`, armazenada em JSONL sob `~/.claude/projects/`).
 
-São **complementares**: o transcript guarda o *raciocínio* (perdido no `/clear`); o worklog guarda o *estado comprometido* (sobrevive a tudo). Ver [worklog-protocol.md](../concepts/worklog-protocol.md) para o fluxo de resume frio vs. quente.
+São **complementares**: o transcript guarda o *raciocínio* (perdido no `/clear`); o worklog guarda o *estado comprometido* (sobrevive a tudo). Ver [worklog-protocol.md](worklog-protocol.md) para o fluxo de resume frio vs. quente.
 
 ### Estado ACTIVE — worklog de trabalho (nomeado por slug)
 
@@ -910,7 +910,7 @@ Ao iniciar uma feature/hotfix/release, o comando cria `.agents/sessions/<slug>/`
 └── notes.md         # Log append-only de decisões, links e pendências
 ```
 
-**`STATE.md`** — o **ponto de entrada de resume**. É o único arquivo que `/engineer/work`, `/onion` e `/engineer/warm-up` precisam ler para saber o estado. Seu ponteiro `## NEXT` é **autoritativo**; os badges do `plan.md` são detalhe humano subordinado (se divergirem, `STATE.md` vence e o comando sinaliza drift). Esquema completo em [worklog-protocol.md](../concepts/worklog-protocol.md).
+**`STATE.md`** — o **ponto de entrada de resume**. É o único arquivo que `/engineer/work`, `/onion` e `/engineer/warm-up` precisam ler para saber o estado. Seu ponteiro `## NEXT` é **autoritativo**; os badges do `plan.md` são detalhe humano subordinado (se divergirem, `STATE.md` vence e o comando sinaliza drift). Esquema completo em [worklog-protocol.md](worklog-protocol.md).
 
 **`context.md`** — metadados estáveis + mapeamento de fases para o task manager:
 
@@ -967,14 +967,14 @@ O versionamento de `.agents/sessions/` é uma **escolha consciente por projeto**
 - **Gitignored (estado individual/efêmero)** — default para trabalho solo/curto; o worklog é rascunho. É a postura que o `.gitignore` do Onion ships.
 - **Committed (artefato de conhecimento do time)** — válido quando o time trata worklogs como histórico durável de design/decisão (é o que o projeto-alvo `o app de um adotante` faz). Ao commitar, prefira versionar `archived/` e gitignorar os dirs ACTIVE — ou commitar ambos deliberadamente.
 
-Decida uma postura por projeto e registre-a no `.gitignore` com um comentário. Ver `meta-specs/architecture.md` §6.2.
+Decida uma postura por projeto e registre-a no `.gitignore` com um comentário.
 
 ### Regras
 
 - **Slug determinístico**: derivado da branch; nunca inventar nome divergente da branch.
 - **Idempotência**: se o worklog já existe, não sobrescrever `notes.md`/`plan.md`/`STATE.md` — apenas complementar.
 - **Vínculo com task é opcional**: se `TASK_MANAGER_PROVIDER=none`, "Task vinculada" e os Subtask IDs ficam `—` e o worklog opera offline.
-- **Resume barato**: leia `STATE.md` primeiro (Tier-0); só carregue `plan.md` (bloco da fase `[ACTIVE]`), `architecture.md` ou `context.md` sob demanda. Nunca faça `cat` da pasta inteira (anti-pattern "Context Dump"). Protocolo completo em [worklog-protocol.md](../concepts/worklog-protocol.md).
+- **Resume barato**: leia `STATE.md` primeiro (Tier-0); só carregue `plan.md` (bloco da fase `[ACTIVE]`), `architecture.md` ou `context.md` sob demanda. Nunca faça `cat` da pasta inteira (anti-pattern "Context Dump"). Protocolo completo em [worklog-protocol.md](worklog-protocol.md).
 
 ---
 

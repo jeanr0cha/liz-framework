@@ -108,7 +108,7 @@ Siga estes passos para criar o PR:
    *"parece ok"* não é · **triagem em todo achado**: `(blocking)` só com cenário concreto em que o
    veredito sai diferente numa direção previsível ou ao arbítrio de quem conduz, ou em que o artefato
    promete o que não entrega; o resto é `(non-blocking)`, LIMITE com a frase declarada. Cole no brief a
-   seção "Para colar" de [`review-triage.md`](../common/prompts/review-triage.md) — na curadoria, um
+   seção "Para colar" de `review-triage.md` — na curadoria, um
    pré-registro passou por 8 versões sem essa triagem; pedida na 7ª rodada, fechou em 2 (2026-11-05).
 
 7. **Triar o que voltou — e o achado entra NESTE PR.**

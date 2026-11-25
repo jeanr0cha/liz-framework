@@ -442,7 +442,7 @@ O **Task Manager Abstraction** (`.agents/utils/task-manager/`) é a **implementa
 > todas as instâncias. **É falso** — `trust` e `federation-transport` não têm `none.md` (um adapter real já
 > é o fallback total), e `federation-transport` detecta por script. O formato-**papel** admite essa dispensa
 > **desde que declarada no README** (precedente: a divergência `cli`-default do forge, `integrations.md`
-> §1.0). Critério de quando algo vira SDAAL: [Doutrina de Abstração](onion-abstraction-doctrine.md).
+> §1.0). Critério de quando algo vira SDAAL: Doutrina de Abstração.
 
 ### Por que é canônica?
 
@@ -598,11 +598,7 @@ interface CreateTaskInput {
 
 ### Spec-as-Code
 
-SDAAL é uma aplicação de [Spec-as-Code](spec-as-code-strategy.md) focada em abstrações técnicas ao invés de requisitos de negócio.
-
-### AI Agent Design Patterns
-
-SDAAL complementa [AI Agent Design Patterns](ai-agent-design-patterns.md) fornecendo a camada de infraestrutura que agentes utilizam.
+SDAAL é uma aplicação de Spec-as-Code focada em abstrações técnicas ao invés de requisitos de negócio.
 
 ### Task Manager Abstraction
 
@@ -638,7 +634,6 @@ O [Task Manager Abstraction](task-manager-abstraction.md) é a **instância can�
 
 ### Internos (Liz Framework)
 - `/meta-create-abstraction` - Gerador automático de SDAAL
-- [Template de Abstração](.agents/templates/abstraction-template.md) - Template base
 
 ### Externos
 - [Adapter Pattern - Refactoring Guru](https://refactoring.guru/design-patterns/adapter)

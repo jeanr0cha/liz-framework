@@ -30,6 +30,7 @@ Uma recomendação só, não um cardápio.
 - **Nenhuma sessão aberta e nada combinado** → `/product-collect`.
 - **Tem uma ideia, mas ainda sem tarefa** → `/product-feature` (ou `/product-refine` antes, se tem dúvida).
 - **Tem tarefa e ainda não começou** → `/engineer-start`.
+- **Sessão aberta, mas uma dúvida técnica trava o plano** → `/engineer-spike`.
 - **Tem sessão aberta** → `/engineer-work` (ou `/catch-up` se a pessoa não lembra onde parou).
 - **Terminou as fases** → `/engineer-pre-pr` e depois `/engineer-pr`.
 
@@ -37,7 +38,7 @@ Uma recomendação só, não um cardápio.
 
 ```
 /warm-up → /product-collect → /product-refine → /product-spec → /product-feature
-         → /engineer-start → /engineer-plan → /engineer-work → /engineer-pre-pr → /engineer-pr
+         → /engineer-start → (/engineer-spike) → /engineer-plan → /engineer-work → /engineer-pre-pr → /engineer-pr
 ```
 
 | Passo | Comando | Para quê |
@@ -49,7 +50,8 @@ Uma recomendação só, não um cardápio.
 | Tirar as dúvidas | `/product-refine` | perguntas até a ideia ficar clara (opcional) |
 | Escrever o que será feito | `/product-spec` | especificação curta (opcional) |
 | Criar a tarefa | `/product-feature` | a ideia vira tarefa pronta, já dizendo em quais repos mexe |
-| Começar | `/engineer-start` | cria a branch em cada repo afetado e a sessão |
+| Começar | `/engineer-start` | cria a branch em cada repo afetado, a sessão e o desenho da mudança |
+| Tirar uma dúvida técnica | `/engineer-spike` | teste curto e descartável antes de planejar (opcional) |
 | Planejar | `/engineer-plan` | divide em fases pequenas, cada uma num repo |
 | Trabalhar | `/engineer-work` | uma fase por vez, com aprovação |
 | Revisar | `/engineer-pre-pr` | revisão e testes antes do PR |
@@ -65,6 +67,7 @@ Antigravity IDE, com `/`. No Antigravity CLI (`agy`), peça pelo nome: "rode a s
 |---|---|
 | Organizar e priorizar ideias | `@product-agent` |
 | Quebrar uma tarefa grande | `@task-specialist` |
+| Desenhar a arquitetura ou decidir entre abordagens | `@software-architect` |
 | Revisar o código | `@code-reviewer` |
 | Escrever testes | `@test-engineer` |
 

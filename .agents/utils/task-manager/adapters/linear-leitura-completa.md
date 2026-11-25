@@ -1,7 +1,7 @@
 <!-- adapter-auxiliar: linear -->
 # 🟣 Linear — Leitura completa e anexos (medição ao vivo de 2026-10-12, SAC-116)
 
-> **Irmão de [`linear.md`](linear.md) por *progressive disclosure* ([`sdaal.md` §14.5](../../../../docs/sdaal/sdaal.md)).**
+> **Irmão de [`linear.md`](linear.md) por *progressive disclosure* (`sdaal.md` §14.5).**
 > O adapter guarda o contrato e os métodos (`getActivity(`, `getHierarchyContext(`, `getAttachments(`,
 > `readAttachment(`, `getInlineRefs(`, `addAttachment(`); este arquivo guarda as **primárias lidas, a medição
 > ao vivo e a postura de segurança** da leitura completa e dos anexos. O corte segue a fronteira de

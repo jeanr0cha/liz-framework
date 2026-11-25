@@ -70,6 +70,8 @@ Dicas:
 
 No caso desta pesquisa levantar uma nova decisão arquitetural ou contradição com as decisões anteriores, você iniciará uma discussão sobre isso com o humano, concordará com as mudanças e atualizará o documento architecture.md para aquela funcionalidade se necessário.
 
+Se a sessão tiver fichas de spike (`spike-*.md`), use o resultado delas como fato e cite-as nas fases que dependem delas. Se surgir uma dúvida técnica que só um teste responde, pare e proponha um `/engineer-spike` em vez de planejar em cima de um chute.
+
 Este documento também deve anotar quais tarefas precisam ser feitas sequencialmente ou em paralelo.
 
 **Workspace com vários repos:** cada fase pertence a **um** repo (campo `Repo:` no header da fase).

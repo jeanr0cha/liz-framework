@@ -108,13 +108,19 @@ Dado seu entendimento do que será construído, você agora procederá ao desenv
 É aqui que você colocará seu chapéu de pensamento ultra e considerará o melhor caminho para construir a funcionalidade, considerando também os padrões e melhores práticas deste projeto.
 
 Seu documento de arquitetura deve incluir:
-    - Uma visão geral de alto nível do sistema (antes e depois da mudança)
+    - Uma visão geral de alto nível do sistema (antes e depois da mudança), com diagrama C4 em Mermaid do nível que muda (containers e, se preciso, componentes)
     - Componentes afetados e suas relações, dependências
     - Padrões e melhores práticas que serão mantidos ou introduzidos
     - Dependências externas
     - Restrições e suposições
     - Trade-offs e alternativas
+    - Decisões caras de desfazer ou que afetam mais de um repo, marcadas como candidatas a ADR
+    - Dúvidas abertas que só um teste responde
     - Lista dos principais arquivos a serem editados/criados
+
+O formato dos diagramas e dos ADRs está em `.agents/knowledge/c4-adr-patterns.md`. Se o desenho for grande (vários repos, contrato novo, mudança de dados), delegue o rascunho ao `@software-architect` e revise o que ele trouxer.
+
+Se uma dúvida aberta trava o desenho ("a lib aguenta?", "a API de terceiros permite?"), não chute: proponha ao humano um `/engineer-spike` antes do `/engineer-plan`.
 
 Uma vez que tenha um bom entendimento do que está sendo construído, salve-o no arquivo .agents/sessions/<feature-slug>/architecture.md e peça ao humano para revisar.
 

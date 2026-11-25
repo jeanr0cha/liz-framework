@@ -56,11 +56,11 @@ Lineup atual do Claude no Claude Code — use estes modelos; não há modelos Op
 
 > **Reverificado em 2026-11-18** no [overview de modelos](https://platform.claude.com/docs/en/models/overview): os quatro modelos vigentes têm **1M de contexto e 128K de saída**. A versão anterior desta tabela dava 200K ao `haiku` e 200K–1M ao `sonnet`, o que não vale mais. O Haiku 5.5 cobra mais caro acima de 100K tokens de prompt ($0,50/$2,50 em vez de $0,10/$0,50 por MTok, CHANGELOG do Claude Code 2.1.293), o que pesa no tiering de workers com contexto grande.
 
-> ⚠️ **Versões acima são SNAPSHOT (2026-11-18), não lineup vigente** — o lineup drifta (de jun a nov/2026 a linha foi de 4.x a 5 e a 5.5, e **fable** é tier *acima* de opus, não par). Os **limites de contexto por tier** seguem úteis; para *qual modelo usar*, cite por **tier** e consulte a fonte única do lineup: [`agent-orchestration.md` §Disponibilidade de modelos](agent-orchestration.md).
+> ⚠️ **Versões acima são SNAPSHOT (2026-11-18), não lineup vigente** — o lineup drifta (de jun a nov/2026 a linha foi de 4.x a 5 e a 5.5, e **fable** é tier *acima* de opus, não par). Os **limites de contexto por tier** seguem úteis; para *qual modelo usar*, cite por **tier** e consulte a fonte única do lineup: `agent-orchestration.md` §Disponibilidade de modelos.
 
 **Nota**: 1 token ≈ 4 caracteres em inglês, ~3 em código.
 
-**Tiering de modelos** (doutrina "orchestration era"): o orquestrador roda no tier `opus` (hoje **Opus 5.5**; ou o tier Mythos-class/`fable` quando o raciocínio domina **e a conta tem acesso**); os workers paralelos rodam em `sonnet` ou `haiku`. Reservar o modelo caro só para o nível que decide reduz custo agregado sem perder qualidade no resultado final. **Referência por-tier (evergreen)**: o lineup e a disponibilidade vivem na fonte única [`agent-orchestration.md` §Disponibilidade de modelos](agent-orchestration.md) — atualizar SÓ lá mantém isto corrente (não hardcodar versão aqui). Veja [Custo em Orquestração (Multi-Agente)](#-custo-em-orquestração-multi-agente).
+**Tiering de modelos** (doutrina "orchestration era"): o orquestrador roda no tier `opus` (hoje **Opus 5.5**; ou o tier Mythos-class/`fable` quando o raciocínio domina **e a conta tem acesso**); os workers paralelos rodam em `sonnet` ou `haiku`. Reservar o modelo caro só para o nível que decide reduz custo agregado sem perder qualidade no resultado final. **Referência por-tier (evergreen)**: o lineup e a disponibilidade vivem na fonte única `agent-orchestration.md` §Disponibilidade de modelos — atualizar SÓ lá mantém isto corrente (não hardcodar versão aqui). Veja [Custo em Orquestração (Multi-Agente)](#-custo-em-orquestração-multi-agente).
 
 ---
 
@@ -270,7 +270,7 @@ Em um fan-out, N subagentes recebem o **mesmo prefixo** (system prompt do worker
 
 > **A coordenação custa 0 tokens de modelo.** Na ferramenta nativa **Workflow** (Dynamic Workflows, lançada em research preview em 28/mai/2026), a lógica de orquestração — `agent(...)`, `parallel([...])`, `pipeline(...)`, agregação e validação de `schema` — roda em **JavaScript**, não consome tokens do modelo. Apenas as chamadas de subagente (`agent`) gastam tokens. Combinado com prompt caching no prefixo compartilhado, o overhead de coordenar uma orquestração grande tende a zero: você paga pelos workers e pelo prefixo (uma vez), não por orquestrar.
 
-Detalhamento de custo e alocação de budget entre orquestrador e workers em [Custo em Orquestração (Multi-Agente)](#-custo-em-orquestração-multi-agente). Para os padrões de orquestração em si (fan-out, pipeline, isolamento por worktree), veja [agent-orchestration.md](agent-orchestration.md).
+Detalhamento de custo e alocação de budget entre orquestrador e workers em [Custo em Orquestração (Multi-Agente)](#-custo-em-orquestração-multi-agente). Para os padrões de orquestração em si (fan-out, pipeline, isolamento por worktree), veja agent-orchestration.md.
 
 ---
 
@@ -531,7 +531,7 @@ Paralelizar tem custo fixo (o budget do orquestrador para fan-out e síntese). C
 
 **Heurística:** paralelize quando o trabalho é divisível em itens independentes **e** o prefixo compartilhado (cacheável) é grande em relação à fatia volátil de cada worker — aí o caching + a coordenação em JS (0 tokens) fazem o custo marginal de cada worker tender só ao seu trabalho real.
 
-> Os padrões de orquestração citados (fan-out-and-synthesize, pipeline, classify-and-act, generate-and-filter, adversarial verification, tournament, loop-until-done) estão detalhados em [agent-orchestration.md](agent-orchestration.md).
+> Os padrões de orquestração citados (fan-out-and-synthesize, pipeline, classify-and-act, generate-and-filter, adversarial verification, tournament, loop-until-done) estão detalhados em agent-orchestration.md.
 
 ---
 
@@ -619,8 +619,6 @@ Estamos trabalhando com React.
 
 ### Conceitos Relacionados
 
-- [agent-orchestration.md](agent-orchestration.md) — padrões de orquestração (fan-out, pipeline, isolamento por worktree) e onde o custo multi-agente desta KB se aplica
-- [ai-agent-design-patterns.md](ai-agent-design-patterns.md) — padrões de design de agentes de IA
 
 ---
 

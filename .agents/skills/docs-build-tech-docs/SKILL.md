@@ -132,6 +132,7 @@ docs/technical-context/
 ├── index.md
 ├── 01-core/
 │   ├── project-charter.md
+│   ├── architecture.md
 │   └── adr/
 │       └── <NNN-decisao>.md
 ├── 02-ai-context/
@@ -152,7 +153,8 @@ docs/technical-context/
 |---------|----------|
 | `index.md` | Perfil técnico + links para todas as camadas |
 | `01-core/project-charter.md` | Visão, objetivos, escopo, stakeholders, restrições técnicas |
-| `01-core/adr/<NNN>-<decisao>.md` | ADRs para decisões arquiteturais: tecnologia, padrão, trade-off |
+| `01-core/architecture.md` | C4 em Mermaid: contexto (nível 1) e containers (nível 2), com cada repo do workspace; fluxos principais em `sequenceDiagram` |
+| `01-core/adr/<NNN>-<decisao>.md` | ADRs para decisões arquiteturais: tecnologia, padrão, trade-off (modelo em `.agents/knowledge/c4-adr-patterns.md`) |
 | `02-ai-context/ai-development-guide.md` | Style guide, padrões, gotchas, considerações de performance/segurança |
 | `02-ai-context/codebase-guide.md` | Mapa de diretórios, arquivos-chave, fluxo de dados, integrações |
 | `03-domain/business-logic.md` | Conceitos de domínio, regras, edge cases, workflows (se aplicável) |
@@ -174,7 +176,7 @@ docs/technical-context/
 
 📊 ESTRUTURA:
    ∟ index.md
-   ∟ 01-core/        (project-charter + N ADRs)
+   ∟ 01-core/        (project-charter + architecture C4 + N ADRs)
    ∟ 02-ai-context/  (N arquivos)
    ∟ 03-domain/      (N arquivos)
    ∟ 04-workflow/    (N arquivos)
@@ -220,6 +222,7 @@ docs/technical-context/
 ## 🔗 Referências
 
 - **Template-base**: `.agents/templates/technical-context-template.md`
+- **C4 e ADR**: `.agents/knowledge/c4-adr-patterns.md` (em projeto grande, delegue os diagramas ao `@software-architect`)
 - **Pasta-alvo**: a resolvida por `resolve-context-dir.sh technical` (default `docs/technical-context/`)
 - **Comando complementar**: `/docs-build-business-docs`
 - **Knowledge base**: `docs/knowledge-base/`
@@ -229,7 +232,7 @@ docs/technical-context/
 ## ⚠️ Notas
 
 - Não criar um único arquivo grande — sempre multi-arquivo linkado pelo `index.md`
-- ADRs devem usar formato MADR ou similar (contexto, decisão, consequências)
+- ADRs seguem o modelo de `.agents/knowledge/c4-adr-patterns.md` (contexto, decisão, alternativas, consequências)
 - Marcar gaps como `[TO BE COMPLETED]` com instruções específicas
 - Regenerar quando arquitetura muda (novo serviço, refator grande, troca de stack)
 - Cross-link com `docs/business-context/` quando decisão técnica tem impacto de negócio

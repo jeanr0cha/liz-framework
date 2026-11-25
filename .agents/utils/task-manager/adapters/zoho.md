@@ -273,7 +273,7 @@ GET  /projects/{projectId}/tasks/{taskId}/comments
 Formatação: **Markdown simples**. Zoho não exige ADF (Jira) nem Unicode visual (ClickUp), então **não
 existe fragmento de formatação próprio** — e não criar um é decisão, não esquecimento. A estratégia dual
 de comentário (detalhado na subtask, resumido na principal, com timestamp e status) é do fragmento
-[`task-manager-auto-update`](../../../commands/common/prompts/task-manager-auto-update.md).
+[`task-manager-auto-update`](../../../shared/task-manager-auto-update.md).
 
 ### Atribuir responsável — o campo é `owners_and_work`, e é OBJETO
 

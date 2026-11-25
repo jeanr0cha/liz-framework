@@ -63,13 +63,14 @@ Atualiza só o que é do framework (lista em `.agents/.liz-manifest`). Não toca
 | `/product-refine` | perguntas até a ideia ficar clara |
 | `/product-spec` | especificação curta |
 | `/product-feature` | a ideia vira tarefa (com os repos afetados) |
-| `/engineer-start` | branch em cada repo afetado + sessão |
+| `/engineer-start` | branch em cada repo afetado + sessão + desenho (C4) |
+| `/engineer-spike` | responde uma dúvida técnica antes de planejar (opcional) |
 | `/engineer-plan` | plano em fases, cada fase num repo |
 | `/engineer-work` | executa uma fase por vez, com aprovação |
 | `/engineer-pre-pr` | revisão e testes antes do PR |
 | `/engineer-pr` | um PR por repo afetado |
 
-Especialistas: `@product-agent`, `@task-specialist`, `@code-reviewer`, `@test-engineer`.
+Especialistas: `@product-agent`, `@task-specialist`, `@software-architect`, `@code-reviewer`, `@test-engineer`.
 
 ## Estrutura deste repo
 

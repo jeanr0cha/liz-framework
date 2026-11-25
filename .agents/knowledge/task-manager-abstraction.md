@@ -62,7 +62,7 @@ Uma camada de abstração baseada no **Adapter Pattern** que:
 
 **Doutrina de transporte**: API-first. MCP é transporte opcional (via
 `TASK_MANAGER_TRANSPORT=mcp`), não o default. Ver
-[integrations.md](../../../docs/meta-specs/integrations.md).
+integrations.md.
 
 ---
 
@@ -364,8 +364,4 @@ Provedor configurado: clickup
 ## 📚 Relacionados
 
 - [Specification-Driven AI Abstraction Layer](specification-driven-ai-abstraction-layer.md) - Padrão de design usado nesta abstração
-- [AI Agent Design Patterns](ai-agent-design-patterns.md)
-- [Spec-as-Code Strategy](spec-as-code-strategy.md)
-- [Configuration Management](configuration-management.md)
-- [Claude Code Commands Best Practices](../tools/claude-code-commands-best-practices-2026.md)
 

@@ -437,7 +437,7 @@ Campos principais do **Create Task** [1]:
 - Autenticar o webhook de saída (segredo no header/URL) e validar no receptor fica por conta do
   integrador `[INFERÊNCIA]`. A disponibilidade de webhooks pode variar por plano `[INFERÊNCIA]`.
 
-> Fluxo completo usando isto: [GLPI → Zoho: chamado vira tarefa](../patterns/glpi-zoho-ticket-to-task.md).
+> Fluxo completo usando isto: GLPI → Zoho: chamado vira tarefa.
 
 ---
 
@@ -599,15 +599,15 @@ serve — sem ela, a conclusão teria sido "o campo não existe" e a V2 nunca se
 ## 🔗 Integração com o Liz Framework
 
 - **Não é um provider do SDAAL de task manager.** `TASK_MANAGER_PROVIDER` aceita `jira | clickup |
-  asana | linear | none` (ver [task-manager-abstraction](../concepts/task-manager-abstraction.md)).
+  asana | linear | none` (ver [task-manager-abstraction](task-manager-abstraction.md)).
   Operar tasks do Zoho via `/product-task` exigiria um **adapter novo** em
   `.agents/utils/task-manager/adapters/`, caminho de `/meta-create-abstraction` + sinal upstream ao core.
 - **Segredos:** `ZOHO_*` no `.env`, carregado com `set -a; source .env; set +a`. Doutrina em
-  [secret-handling-agent](../concepts/secret-handling-agent.md). Nunca imprimir o token em log ou chat.
+  secret-handling-agent. Nunca imprimir o token em log ou chat.
 - **Configuração guiada:** a configuração no `.env` (ver `.agents/utils/task-manager/README.md`) é o comando canônico para registrar as variáveis.
-- **Integrações estudadas:** [GLPI → Zoho: chamado vira tarefa](../patterns/glpi-zoho-ticket-to-task.md) · KB irmã [glpi-api](glpi-api.md).
+- **Integrações estudadas:** GLPI → Zoho: chamado vira tarefa · KB irmã glpi-api.
 - **Frescor:** a API mudou de major (V2→V3) em 2025. Reverifique esta KB contra [1] antes de
-  decisão (`/meta-kb-freshness`; doutrina [verify-external-for-current](../concepts/verify-external-for-current.md)).
+  decisão (`/meta-kb-freshness`; doutrina verify-external-for-current).
 
 ---
 
