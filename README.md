@@ -1,10 +1,25 @@
+<div align="center">
+
 # 🦊 Liz Framework
 
-Framework de desenvolvimento com IA que funciona no **Claude Code**, no **Codex** e no **Antigravity**.
-Você manda a tarefa, e o Liz organiza o ciclo **ideia → tarefa → desenho → plano → código → PR**, com
-sessões que podem ser retomadas, em **um ou vários repos ao mesmo tempo** (backend, frontend, MCP...).
+**Desenvolvimento com IA, da ideia ao PR, em um ou vários repos.**
 
-> Baseado no **[Onion](https://github.com/marciocar/onion)**, de Marcio Carvalho. Veja [NOTICE.md](NOTICE.md).
+[![Claude Code](https://img.shields.io/badge/Claude_Code-suportado-D97757)](#como-chamar-em-cada-ferramenta)
+[![Codex](https://img.shields.io/badge/Codex-suportado-412991)](#como-chamar-em-cada-ferramenta)
+[![Antigravity](https://img.shields.io/badge/Antigravity-suportado-4285F4)](#como-chamar-em-cada-ferramenta)
+[![Licença](https://img.shields.io/badge/licença-MIT_%2B_CC_BY--NC-lightgrey)](#licença)
+
+Você manda a tarefa, e o Liz organiza o ciclo<br>
+**ideia → tarefa → desenho → plano → código → PR**<br>
+com sessões que podem ser retomadas, em **vários repos ao mesmo tempo** (backend, frontend, MCP...).
+
+[Começar](#começar-em-1-minuto) · [O ciclo](#o-ciclo) · [Comandos](#comandos) · [Especialistas](#especialistas) · [Exemplo](#exemplo) · [Instalar e atualizar](#instalar-e-atualizar)
+
+<sub>Baseado no <a href="https://github.com/marciocar/onion">Onion</a>, de Marcio Carvalho. Veja <a href="NOTICE.md">NOTICE.md</a>.</sub>
+
+</div>
+
+---
 
 ## Começar em 1 minuto
 
@@ -71,8 +86,13 @@ Engenharia  /engineer-start → /engineer-spike → /engineer-plan → /engineer
 | | `/engineer-pre-pr` | revisar e testar tudo antes do PR |
 | | `/engineer-pr` | abrir um PR por repo afetado |
 
-**Como chamar em cada ferramenta:** no Claude Code e no Antigravity IDE, `/engineer-start`; no Codex,
-`$engineer-start`; no Antigravity CLI (`agy`), peça pelo nome: "rode a skill engineer-start".
+### Como chamar em cada ferramenta
+
+| Ferramenta | Exemplo |
+|---|---|
+| Claude Code e Antigravity IDE | `/engineer-start` |
+| Codex | `$engineer-start` |
+| Antigravity CLI (`agy`) | peça pelo nome: "rode a skill engineer-start" |
 
 ## Especialistas
 
@@ -157,3 +177,9 @@ necessário para os adaptadores executáveis do Linear e do ClickUp.
 
 Código: MIT ([LICENSE](LICENSE)). Documentação de método derivada do Onion: CC BY-NC 4.0
 ([LICENSE-DOCS](LICENSE-DOCS)). Uso pessoal e nos seus projetos à vontade; não revenda o método.
+
+---
+
+<div align="center">
+<sub>🦊 Feito para trabalhar junto com a IA, uma fase de cada vez.</sub>
+</div>
