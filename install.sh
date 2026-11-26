@@ -225,6 +225,15 @@ if [ "$DRY" -eq 0 ]; then
   rm -f "$GI.tmp"
 fi
 
+# --- 8. registro local de projetos (~/.liz) -----------------------------------
+if [ "$DRY" -eq 1 ]; then say "   (dry-run) registraria o projeto em ~/.liz/projects.tsv"
+else
+  # shellcheck source=lib/registry.sh
+  if [ -f "$FW/lib/registry.sh" ] && . "$FW/lib/registry.sh" && registry_add "$DEST" 2>/dev/null; then
+    say "   ✅ projeto registrado (liz.sh list mostra todos)"
+  else say "   ⚠️  não consegui registrar em ~/.liz (a instalação não é afetada)"; fi
+fi
+
 say ""
 say "🎉 Pronto. Próximo passo: abra a IA (Claude Code, Codex ou Antigravity) nesta pasta e rode /warm-up"
 say "   (no Codex: \$warm-up). Para atualizar depois: bash <caminho-do-liz-framework>/update.sh --pull"

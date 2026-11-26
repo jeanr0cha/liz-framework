@@ -13,7 +13,7 @@ Você manda a tarefa, e o Liz organiza o ciclo<br>
 **ideia → tarefa → desenho → plano → código → PR**<br>
 com sessões que podem ser retomadas, em **vários repos ao mesmo tempo** (backend, frontend, MCP...).
 
-[Começar](#começar-em-1-minuto) · [O ciclo](#o-ciclo) · [Comandos](#comandos) · [Especialistas](#especialistas) · [Exemplo](#exemplo) · [Instalar e atualizar](#instalar-e-atualizar)
+[Começar](#começar-em-1-minuto) · [O ciclo](#o-ciclo) · [Comandos](#comandos) · [Especialistas](#especialistas) · [Exemplo](#exemplo) · [Instalar e atualizar](#instalar-e-atualizar) · [Painel](#painel)
 
 <sub>Baseado no <a href="https://github.com/marciocar/onion">Onion</a>, de Marcio Carvalho. Veja <a href="NOTICE.md">NOTICE.md</a>.</sub>
 
@@ -152,6 +152,31 @@ ser editadas à mão:
 | Codex | `AGENTS.md` + `.agents/skills/` | `.codex/agents/*.toml` |
 | Antigravity | `AGENTS.md` + `.agents/skills/` | `.agents/workflows/*.md` |
 
+## Painel
+
+Para acompanhar todos os projetos onde o Liz está instalado (versão, aviso de desatualizado, repos, sessões abertas e documentos) e atualizar com um clique, tudo rodando **somente na sua máquina**:
+
+```bash
+bash liz.sh atalho   # Windows: cria o atalho "Liz" na Área de Trabalho e no Menu Iniciar
+bash liz.sh painel   # abre o painel direto pelo terminal (Windows, macOS ou Linux)
+```
+
+- **Requisito:** Node.js ≥ 18 (sem instalar pacotes; quem não usa o painel não precisa de Node).
+- **Barra de tarefas (Windows):** clique direito no atalho `Liz` → *Fixar na barra de tarefas*. Como a janela abre em modo aplicativo do Microsoft Edge, o ícone aberto pode agrupar com o Edge ou aparecer ao lado do atalho — isso é normal; a forma mais prática é fixar o atalho e sempre abrir por ele.
+- **No terminal (`liz.sh`):**
+
+```bash
+bash liz.sh list [--tsv]                # lista projetos registrados e status da versão
+bash liz.sh info <caminho> [--tsv]      # repos, sessões abertas e docs de um projeto
+bash liz.sh scan <pasta> [--depth N]    # procura projetos com Liz e adiciona ao registro
+bash liz.sh add <caminho>               # adiciona projeto existente ao registro
+bash liz.sh remove <caminho>            # tira do registro (nunca apaga arquivos)
+bash liz.sh install <pasta> [--tools …] # instala o Liz na pasta e registra
+bash liz.sh update <caminho> | --all [--pull]
+bash liz.sh check                       # consulta novidades do framework no GitHub
+bash liz.sh version                     # mostra a versão local do framework
+```
+
 ## Estrutura deste repo
 
 | Pasta | Conteúdo |
@@ -164,14 +189,17 @@ ser editadas à mão:
 | `.agents/templates/` | modelos dos docs gerados |
 | `templates/` | o que o instalador cria no projeto (`AGENTS.md`, `docs/`) |
 | `install.sh`, `update.sh` | instalar e atualizar |
+| `liz.sh`, `lib/` | motor CLI e registro local de projetos (não copiados para os projetos) |
+| `painel/` | painel local com botões e atalho Windows (opcional, não copiado para os projetos) |
 
 Para evoluir o próprio framework, siga as regras do [AGENTS.md](AGENTS.md). O histórico de versões
 fica no [CHANGELOG.md](CHANGELOG.md).
 
 ## Requisitos
 
-`bash` (no Windows, o Git Bash), `git`, `awk`. O `gh` (GitHub CLI) para abrir PRs. O Python só é
-necessário para os adaptadores executáveis do Linear e do ClickUp.
+`bash` (no Windows, o Git Bash), `git`, `awk`. O `gh` (GitHub CLI) para abrir PRs. Node.js ≥ 18 é
+necessário apenas para o painel local (opcional). O Python só é necessário para os adaptadores
+executáveis do Linear e do ClickUp.
 
 ## Licença
 

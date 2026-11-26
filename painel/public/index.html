@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="liz-token" content="__LIZ_TOKEN__">
+  <title>Liz Framework — Painel</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">🦊</span>
+      <h1>Liz</h1>
+      <span id="fw-version" class="badge-version">v...</span>
+    </div>
+    <nav class="actions" aria-label="Ações principais">
+      <button id="btn-check" class="btn" type="button">Verificar novidades</button>
+      <button id="btn-update-all" class="btn btn-primary hidden" type="button">Atualizar todos</button>
+      <button id="btn-add" class="btn" type="button">Adicionar projeto</button>
+      <button id="btn-scan" class="btn" type="button">Procurar projetos</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section id="banner" class="banner hidden" role="status" aria-live="polite"></section>
+
+    <section id="job-panel" class="job-panel hidden" aria-label="Saída da operação">
+      <div class="job-header">
+        <strong id="job-title">Operação em andamento...</strong>
+        <button id="btn-close-job" class="btn btn-sm" type="button">Fechar</button>
+      </div>
+      <pre id="job-log" class="job-log"></pre>
+    </section>
+
+    <div class="summary-row">
+      <p id="summary" class="summary">Carregando projetos...</p>
+      <button id="btn-refresh" class="btn btn-sm" type="button">Recarregar</button>
+    </div>
+
+    <section id="state-loading" class="state-box">Carregando projetos registrados...</section>
+
+    <section id="state-error" class="state-box state-error hidden">
+      <p id="error-message">Não foi possível comunicar com o servidor local.</p>
+      <button id="btn-retry" class="btn btn-primary" type="button">Tentar de novo</button>
+    </section>
+
+    <section id="state-empty" class="state-box hidden">
+      <p><strong>Nenhum projeto ainda.</strong></p>
+      <p>Use <em>Procurar projetos</em> ou <em>Adicionar projeto</em> para começar.</p>
+    </section>
+
+    <section id="projects-list" class="projects-list" aria-label="Lista de projetos"></section>
+  </main>
+
+  <aside id="detail-drawer" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div>
+          <h2 id="detail-title">Projeto</h2>
+          <p id="detail-path" class="muted"></p>
+        </div>
+        <button id="btn-close-detail" class="btn btn-sm" type="button">Fechar</button>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="repos" role="tab" aria-selected="true" type="button">Repos</button>
+        <button class="tab" data-tab="sessions" role="tab" aria-selected="false" type="button">Sessões</button>
+        <button class="tab" data-tab="docs" role="tab" aria-selected="false" type="button">Documentos</button>
+      </div>
+
+      <div id="detail-body" class="drawer-body"></div>
+    </div>
+  </aside>
+
+  <dialog id="modal-dialog" class="modal">
+    <form method="dialog" class="modal-box" id="modal-form">
+      <h3 id="modal-title">Confirmar</h3>
+      <p id="modal-message"></p>
+      <div id="modal-input-wrap" class="modal-input-wrap hidden">
+        <label for="modal-input" id="modal-input-label">Caminho da pasta</label>
+        <input id="modal-input" type="text" autocomplete="off">
+      </div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

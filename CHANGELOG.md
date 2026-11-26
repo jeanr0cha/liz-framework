@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-11-26
+
+Painel local de projetos e CLI `liz.sh`.
+
+- Registro local de projetos (`~/.liz/projects.tsv`): `install.sh` passa a registrar o projeto ao concluir (em `--dry-run` não grava, e qualquer falha no registro não interrompe a instalação).
+- Novo motor `liz.sh` (bash + awk + git) com subcomandos: `list [--tsv]`, `info <caminho> [--tsv]`, `scan`, `add`, `remove`, `install`, `update` (um projeto ou `--all`, com `--pull`), `check`, `painel`, `atalho` e `version`.
+- Novo painel local com botões (`painel/`): servidor em Node.js (≥ 18) sem dependências npm, rodando apenas em `127.0.0.1` com encerramento automático e instância única. Mostra versões, status (`ok`, `desatualizado`, `mais-novo`, `ausente` etc.), repos, sessões abertas e documentos Markdown, e atualiza projetos com um clique.
+- Atalho de dois cliques no Windows (`bash liz.sh atalho`): cria `Liz.lnk` na Área de Trabalho e no Menu Iniciar com ícone 🦊 e abertura sem console.
+- Segurança do painel: token aleatório por execução, validação de `Host` e `Origin`, CSP estrita, bloqueio de *path traversal* e leitura de `.env`, visualizador de Markdown sem HTML executável e suite automatizada `painel/teste-seguranca.sh`.
+
 ## 0.2.1 — 2026-11-25
 
 - README reorganizado: começo rápido, o ciclo e as sessões em poucas linhas, comandos agrupados por etapa
