@@ -128,6 +128,25 @@ usar Jira, ClickUp, Asana, Linear ou Zoho Projects, crie um `.env` na raiz do wo
 `TASK_MANAGER_PROVIDER` e as chaves do gerenciador (lista em `.agents/utils/task-manager/README.md`).
 A IA nunca abre nem imprime o `.env`.
 
+## Consumo de tokens
+
+Ao criar a tarefa e ao planejar as fases, o Liz mostra **quanto de IA aquilo deve consumir**, em faixa:
+
+```
+Consumo estimado (IA): tamanho M · não calibrado (0 de 5 registros)
+  Entrada: 400 mil – 1 milhão tokens  (a maior parte é releitura de contexto em cache, que é barata)
+  Saída:   20 mil – 50 mil tokens
+```
+
+- É **faixa, não promessa**, e o Liz diz quando ainda é uma hipótese. **Não** converte em % do seu plano
+  nem em dinheiro: os limites variam e não são públicos em tokens.
+- Ao fim de cada fase, o `/engineer-work` pergunta (e você pode pular) se quer registrar o consumo real:
+  `bash .agents/utils/tokens/tokens.sh actual --slug <tarefa> --phase <N> --in 450k --out 22k`.
+- Com **5 registros** da mesma ferramenta, a estimativa passa a usar a razão real do seu histórico
+  (`.agents/token-history.tsv`) e a faixa fica mais fiel. `tokens.sh report` mostra estimado × real.
+
+Método completo em [`.agents/knowledge/token-estimation.md`](.agents/knowledge/token-estimation.md).
+
 ## Instalar e atualizar
 
 ```bash
@@ -184,7 +203,7 @@ bash liz.sh version                     # mostra a versão local do framework
 | `.agents/skills/` | os comandos |
 | `.agents/agents/` | os especialistas |
 | `.agents/shared/` | trechos usados por vários comandos |
-| `.agents/utils/` | scripts: workspace, gerenciador de tarefas, GitHub, contexto |
+| `.agents/utils/` | scripts: workspace, gerenciador de tarefas, GitHub, contexto, estimativa de tokens |
 | `.agents/knowledge/` | conhecimento de referência (C4 e ADR, worklog, gitflow, gerenciador de tarefas...) |
 | `.agents/templates/` | modelos dos docs gerados |
 | `templates/` | o que o instalador cria no projeto (`AGENTS.md`, `docs/`) |

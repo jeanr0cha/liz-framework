@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 — 2026-11-26
+
+Estimativa e registro de consumo de tokens.
+
+- Novo `tokens.sh` (`.agents/utils/tokens/`, só bash + awk): estima **em faixa** a entrada e a saída de
+  tokens por tarefa e por fase, com tamanho P/M/G; registra o consumo real; mostra estimado × real e a
+  calibração. Não converte em % do limite do plano nem em dinheiro.
+- Histórico em `.agents/token-history.tsv` (dado do projeto: o `update.sh` não o apaga). Até 4 registros da
+  mesma ferramenta, usa uma tabela de hipóteses (`não calibrado`); com 5 ou mais, usa os quartis do próprio
+  consumo por story point.
+- `product-feature`, `engineer-plan`, `engineer-work`, `engineer-pre-pr` e `engineer-pr` passam a mostrar a
+  estimativa, perguntar (opcionalmente) pelo consumo real ao fim de cada fase e resumir estimado × real.
+  Nenhuma skill nova e nenhuma `description` alterada, para não aumentar o contexto das sessões.
+- Nova KB `token-estimation.md` e trecho compartilhado `shared/token-estimation.md`.
+- Ficou de fora desta versão a leitura automática do consumo (fase opcional): o registro é manual.
+
 ## 0.3.0 — 2026-11-26
 
 Painel local de projetos e CLI `liz.sh`.
