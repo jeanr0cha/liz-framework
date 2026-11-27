@@ -34,6 +34,8 @@ const MAX_BODY_BYTES = 16 * 1024;
 const MAX_JOB_LOG_BYTES = 200 * 1024;
 const MAX_DOC_BYTES = 2 * 1024 * 1024;
 const JOB_TIMEOUT_MS = 10 * 60 * 1000;
+const GIT_TIMEOUT_MS = 5000;
+const GH_TIMEOUT_MS = 20000;
 
 const TOKEN = crypto.randomBytes(32).toString('hex');
 const TOKEN_BUF = Buffer.from(TOKEN, 'utf8');
@@ -46,6 +48,28 @@ const STATIC_FILES = Object.freeze({
 const CSP_HEADER =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
   "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+const GUIDE_EXACT_FILES = new Set(['README.md', 'CHANGELOG.md']);
+const GUIDE_ALLOWED_PREFIXES = [
+  '.agents/skills/',
+  '.agents/agents/',
+  '.agents/knowledge/',
+  '.agents/shared/',
+];
+
+const CYCLE_DEFINITION = [
+  { step: 1, label: 'Warm-up', command: 'warm-up', group: 'Orientação', optional: false },
+  { step: 2, label: 'Coletar ideia', command: 'product-collect', group: 'Produto', optional: false },
+  { step: 3, label: 'Refinar', command: 'product-refine', group: 'Produto', optional: true },
+  { step: 4, label: 'Especificar', command: 'product-spec', group: 'Produto', optional: true },
+  { step: 5, label: 'Criar tarefa', command: 'product-feature', group: 'Produto', optional: false },
+  { step: 6, label: 'Iniciar', command: 'engineer-start', group: 'Engenharia', optional: false },
+  { step: 7, label: 'Spike', command: 'engineer-spike', group: 'Engenharia', optional: true },
+  { step: 8, label: 'Planejar', command: 'engineer-plan', group: 'Engenharia', optional: false },
+  { step: 9, label: 'Executar fase', command: 'engineer-work', group: 'Engenharia', optional: false },
+  { step: 10, label: 'Pré-PR', command: 'engineer-pre-pr', group: 'Engenharia', optional: false },
+  { step: 11, label: 'Abrir PR', command: 'engineer-pr', group: 'Engenharia', optional: false },
+];
 
 let actualPort = 0;
 let server = null;
@@ -64,6 +88,18 @@ function readFrameworkVersion() {
   } catch {
     return '0.0.0';
   }
+}
+
+function compareSemver(a, b) {
+  const pa = String(a || '0.0.0').replace(/-.*$/, '').split('.').map((n) => Number(n) || 0);
+  const pb = String(b || '0.0.0').replace(/-.*$/, '').split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < 3; i++) {
+    const va = pa[i] || 0;
+    const vb = pb[i] || 0;
+    if (va < vb) return -1;
+    if (va > vb) return 1;
+  }
+  return 0;
 }
 
 function safeTokenEqual(candidate) {
@@ -163,23 +199,37 @@ function resolveBashPath() {
   return null;
 }
 
-function runLizCommand(args, timeoutMs = 60000) {
-  return new Promise((resolve, reject) => {
-    const bashPath = resolveBashPath();
-    if (!bashPath) {
-      return reject(
-        new Error(
-          'Git Bash não encontrado. Instale o Git for Windows ou defina a variável LIZ_BASH.'
-        )
-      );
+function resolveGitPath() {
+  if (!IS_WIN) return 'git';
+  const candidates = [
+    process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Git', 'cmd', 'git.exe'),
+    process.env['ProgramFiles(x86)'] &&
+      path.join(process.env['ProgramFiles(x86)'], 'Git', 'cmd', 'git.exe'),
+    process.env.LOCALAPPDATA &&
+      path.join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'cmd', 'git.exe'),
+  ].filter(Boolean);
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return 'git';
+}
+
+function spawnSimple(cmd, args, opts = {}) {
+  return new Promise((resolve) => {
+    const timeoutMs = opts.timeoutMs || 10000;
+    const capture = opts.capture !== false;
+    let child;
+    try {
+      child = spawn(cmd, args, {
+        shell: false,
+        windowsHide: true,
+        cwd: opts.cwd || FW,
+        env: opts.env || process.env,
+        stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'ignore',
+      });
+    } catch (err) {
+      return resolve({ code: -1, stdout: '', stderr: '', error: err });
     }
-    const lizScript = path.join(FW, 'liz.sh');
-    const child = spawn(bashPath, [lizScript, ...args], {
-      shell: false,
-      windowsHide: true,
-      cwd: FW,
-      env: process.env,
-    });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -193,22 +243,42 @@ function runLizCommand(args, timeoutMs = 60000) {
       }
     }, timeoutMs);
 
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString('utf8');
-    });
+    if (capture && child.stdout) {
+      child.stdout.on('data', (c) => {
+        if (stdout.length < MAX_JOB_LOG_BYTES) stdout += c.toString('utf8');
+      });
+    }
+    if (capture && child.stderr) {
+      child.stderr.on('data', (c) => {
+        if (stderr.length < MAX_JOB_LOG_BYTES) stderr += c.toString('utf8');
+      });
+    }
     child.on('error', (err) => {
       clearTimeout(timer);
-      reject(err);
+      resolve({ code: -1, stdout, stderr, error: err, timedOut });
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (timedOut) {
-        return reject(new Error('Tempo limite excedido ao executar o comando.'));
-      }
-      resolve({ code: code ?? 1, stdout, stderr });
+      resolve({ code: code ?? 1, stdout, stderr, timedOut });
+    });
+  });
+}
+
+function runLizCommand(args, timeoutMs = 60000) {
+  return new Promise((resolve, reject) => {
+    const bashPath = resolveBashPath();
+    if (!bashPath) {
+      return reject(
+        new Error(
+          'Git Bash não encontrado. Instale o Git for Windows ou defina a variável LIZ_BASH.'
+        )
+      );
+    }
+    const lizScript = path.join(FW, 'liz.sh');
+    spawnSimple(bashPath, [lizScript, ...args], { cwd: FW, timeoutMs }).then((r) => {
+      if (r.error) return reject(r.error);
+      if (r.timedOut) return reject(new Error('Tempo limite excedido ao executar o comando.'));
+      resolve({ code: r.code, stdout: r.stdout, stderr: r.stderr });
     });
   });
 }
@@ -338,6 +408,9 @@ function parseInfoTsv(raw) {
         status: cols[3],
         nextAction: cols[4],
         lastCheckpoint: cols[5],
+        phasesTotal: cols[6] !== undefined && cols[6] !== '' ? Number(cols[6]) : null,
+        phasesDone: cols[7] !== undefined && cols[7] !== '' ? Number(cols[7]) : null,
+        blockedBy: cols[8] || '',
       });
     } else if (section === 'docs' && cols.length >= 3) {
       result.docs.push({
@@ -349,6 +422,280 @@ function parseInfoTsv(raw) {
   }
   return result;
 }
+
+// --- Fase 1: Guia do Liz (somente arquivos do framework) ---------------------
+
+function parseFrontmatter(markdown) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  if (lines[0] !== '---') return { name: '', description: '' };
+
+  let name = '';
+  let description = '';
+  let inDescBlock = false;
+  const descLines = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === '---') break;
+
+    if (inDescBlock) {
+      if (/^[ \t]+/.test(line) || line.trim() === '') {
+        if (line.trim() !== '') descLines.push(line.trim());
+        continue;
+      } else {
+        inDescBlock = false;
+      }
+    }
+
+    const mName = line.match(/^name:\s*(.+)$/);
+    if (mName) {
+      name = mName[1].trim().replace(/^['"]|['"]$/g, '');
+      continue;
+    }
+
+    const mDesc = line.match(/^description:\s*(.*)$/);
+    if (mDesc) {
+      const val = mDesc[1].trim();
+      if (val === '|' || val === '>' || val === '|-' || val === '>-') {
+        inDescBlock = true;
+      } else {
+        description = val.replace(/^['"]|['"]$/g, '');
+      }
+    }
+  }
+
+  if (descLines.length > 0 && !description) {
+    description = descLines.join(' ');
+  }
+
+  return { name, description: shortenDescription(description, 220) };
+}
+
+function shortenDescription(text, maxLen) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  if (clean.length <= maxLen) return clean;
+  // Tenta manter 1 ou 2 frases dentro do limite
+  const sentences = clean.match(/[^.!?]+[.!?]+/g);
+  if (sentences) {
+    let acc = '';
+    for (const s of sentences.slice(0, 2)) {
+      const next = (acc ? acc + ' ' : '') + s.trim();
+      if (next.length <= maxLen) acc = next;
+      else break;
+    }
+    if (acc) return acc;
+  }
+  const cut = clean.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim() + '…';
+}
+
+function skillGroupOf(name) {
+  if (name.startsWith('product-')) return 'Produto';
+  if (name.startsWith('engineer-')) return 'Engenharia';
+  if (name.startsWith('docs-')) return 'Documentação';
+  return 'Orientação';
+}
+
+function buildGuideData() {
+  const skillsDir = path.join(FW, '.agents', 'skills');
+  const agentsDir = path.join(FW, '.agents', 'agents');
+  const knowledgeDir = path.join(FW, '.agents', 'knowledge');
+
+  const skills = [];
+  const skillNames = new Set();
+  if (fs.existsSync(skillsDir)) {
+    for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillFile = path.join(skillsDir, entry.name, 'SKILL.md');
+      if (!fs.existsSync(skillFile)) continue;
+      try {
+        const md = fs.readFileSync(skillFile, 'utf8');
+        const fm = parseFrontmatter(md);
+        const name = fm.name || entry.name;
+        skillNames.add(name);
+        skills.push({
+          name,
+          group: skillGroupOf(name),
+          description: fm.description || 'Comando do Liz Framework.',
+          file: '.agents/skills/' + entry.name + '/SKILL.md',
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+  skills.sort((a, b) => a.name.localeCompare(b.name));
+
+  const cycle = CYCLE_DEFINITION.filter((c) => skillNames.has(c.command));
+
+  const agents = [];
+  if (fs.existsSync(agentsDir)) {
+    for (const entry of fs.readdirSync(agentsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const agentFile = path.join(agentsDir, entry.name);
+      try {
+        const md = fs.readFileSync(agentFile, 'utf8');
+        const fm = parseFrontmatter(md);
+        const name = fm.name || entry.name.replace(/\.md$/i, '');
+        agents.push({
+          name,
+          description: fm.description || 'Especialista do Liz Framework.',
+          file: '.agents/agents/' + entry.name,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+  agents.sort((a, b) => a.name.localeCompare(b.name));
+
+  const knowledge = [];
+  if (fs.existsSync(knowledgeDir)) {
+    for (const entry of fs.readdirSync(knowledgeDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const kFile = path.join(knowledgeDir, entry.name);
+      try {
+        const md = fs.readFileSync(kFile, 'utf8');
+        const m = md.match(/^#[ \t]+(.+)$/m);
+        knowledge.push({
+          file: '.agents/knowledge/' + entry.name,
+          title: m ? m[1].trim() : entry.name,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+  knowledge.sort((a, b) => a.title.localeCompare(b.title));
+
+  return { cycle, skills, agents, knowledge };
+}
+
+function readAllowedGuideDoc(relFile) {
+  if (!isSafePathInput(relFile)) {
+    return { status: 400, error: 'Caminho de documento inválido.' };
+  }
+  const cleanRel = relFile.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (cleanRel.includes('..')) {
+    return { status: 403, error: 'Caminho não permitido.' };
+  }
+  if (!cleanRel.toLowerCase().endsWith('.md')) {
+    return { status: 403, error: 'Apenas arquivos Markdown (.md) podem ser abertos.' };
+  }
+  const prefixAllowed =
+    GUIDE_EXACT_FILES.has(cleanRel) ||
+    GUIDE_ALLOWED_PREFIXES.some((p) => cleanRel.startsWith(p));
+  if (!prefixAllowed) {
+    return { status: 403, error: 'Arquivo fora da lista permitida do Guia.' };
+  }
+
+  let fwReal;
+  try {
+    fwReal = fs.realpathSync(FW);
+  } catch {
+    return { status: 500, error: 'Pasta do framework inacessível.' };
+  }
+
+  const candidate = path.resolve(fwReal, cleanRel);
+  let fileReal;
+  try {
+    fileReal = fs.realpathSync(candidate);
+  } catch {
+    return { status: 404, error: 'Documento do Guia não encontrado.' };
+  }
+
+  if (!fileReal.toLowerCase().endsWith('.md') || !isInsideDir(fwReal, fileReal)) {
+    return { status: 403, error: 'Arquivo fora do framework.' };
+  }
+
+  const allowedReal =
+    Array.from(GUIDE_EXACT_FILES).some((f) => {
+      try {
+        return normalizePathKey(fs.realpathSync(path.join(fwReal, f))) === normalizePathKey(fileReal);
+      } catch {
+        return false;
+      }
+    }) ||
+    GUIDE_ALLOWED_PREFIXES.some((p) => {
+      try {
+        const dirReal = fs.realpathSync(path.join(fwReal, p));
+        return isInsideDir(dirReal, fileReal);
+      } catch {
+        return false;
+      }
+    });
+
+  if (!allowedReal) {
+    return { status: 403, error: 'Arquivo fora das pastas permitidas do Guia.' };
+  }
+
+  let stat;
+  try {
+    stat = fs.statSync(fileReal);
+  } catch {
+    return { status: 404, error: 'Documento não encontrado.' };
+  }
+  if (!stat.isFile()) {
+    return { status: 400, error: 'O caminho informado não é um arquivo.' };
+  }
+  if (stat.size > MAX_DOC_BYTES) {
+    return { status: 413, error: 'Documento excede o limite de 2 MB.' };
+  }
+
+  const markdown = fs.readFileSync(fileReal, 'utf8');
+  const firstHeading = markdown.match(/^#[ \t]+(.+)$/m);
+  const title = firstHeading ? firstHeading[1].trim() : path.basename(fileReal);
+  return { status: 200, data: { title, markdown } };
+}
+
+// --- Fase 2: Changelog -------------------------------------------------------
+
+function parseChangelogFile() {
+  const file = path.join(FW, 'CHANGELOG.md');
+  if (!fs.existsSync(file)) return [];
+  const raw = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+  const lines = raw.split('\n');
+  const entries = [];
+  let cur = null;
+
+  for (const line of lines) {
+    const m = line.match(/^##[ \t]+(\d+\.\d+\.\d+)[ \t]+[—–-][ \t]+(.+)$/);
+    if (m) {
+      if (cur) {
+        cur.markdown = cur.lines.join('\n').trim();
+        delete cur.lines;
+        entries.push(cur);
+      }
+      cur = { version: m[1].trim(), date: m[2].trim(), lines: [] };
+    } else if (cur) {
+      cur.lines.push(line);
+    }
+  }
+  if (cur) {
+    cur.markdown = cur.lines.join('\n').trim();
+    delete cur.lines;
+    entries.push(cur);
+  }
+
+  entries.sort((a, b) => compareSemver(b.version, a.version));
+  return entries;
+}
+
+function getChangelogEntries(fromVersion) {
+  const current = readFrameworkVersion();
+  const all = parseChangelogFile();
+  if (!fromVersion) {
+    return { current, entries: all };
+  }
+  const filtered = all.filter(
+    (e) => compareSemver(e.version, fromVersion) > 0 && compareSemver(e.version, current) <= 0
+  );
+  return { current, entries: filtered };
+}
+
+// --- Fase 3: Check-up do projeto e PRs abertos -------------------------------
 
 function readWorkspaceContextDirs(projectReal) {
   const wsFile = path.join(projectReal, '.agents', 'workspace.yaml');
@@ -376,6 +723,231 @@ function readWorkspaceContextDirs(projectReal) {
   return [bus, tech];
 }
 
+function readProjectInstalledVersion(projectReal) {
+  const verFile = path.join(projectReal, '.agents', '.liz-version');
+  if (!fs.existsSync(verFile)) return '';
+  try {
+    const raw = fs.readFileSync(verFile, 'utf8');
+    const m = raw.match(/^version:\s*(.+)$/m);
+    return m ? m[1].trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+function resolveRepoDir(projectReal, repoEntry) {
+  const rp = repoEntry.path || repoEntry.name;
+  if (!rp) return null;
+  if (path.isAbsolute(rp)) return path.resolve(rp);
+  return path.resolve(projectReal, rp);
+}
+
+async function checkupProject(projectReal, infoData) {
+  const items = [];
+  const gitBin = resolveGitPath();
+
+  // 1. agents-md
+  const agentsPath = path.join(projectReal, 'AGENTS.md');
+  if (fs.existsSync(agentsPath)) {
+    try {
+      const txt = fs.readFileSync(agentsPath, 'utf8');
+      if (txt.includes('<!-- PREENCHER')) {
+        items.push({
+          id: 'agents-md',
+          level: 'aviso',
+          title: 'AGENTS.md ainda tem campos para preencher',
+          hint: '/warm-up',
+        });
+      }
+    } catch {
+      // ignore
+    }
+  } else {
+    items.push({
+      id: 'agents-md',
+      level: 'aviso',
+      title: 'AGENTS.md não encontrado na raiz do projeto',
+      hint: '/warm-up',
+    });
+  }
+
+  // 2, 3, 10: repos, env-tracked, main-dirty
+  const repos = (infoData && infoData.repos) || [];
+  for (const r of repos) {
+    const repoDir = resolveRepoDir(projectReal, r);
+    const hasGit =
+      repoDir &&
+      fs.existsSync(repoDir) &&
+      (fs.existsSync(path.join(repoDir, '.git')) || fs.existsSync(path.join(repoDir, 'HEAD')));
+
+    if (!hasGit) {
+      items.push({
+        id: 'repos',
+        level: 'erro',
+        title: `Repo não encontrado em ${r.path || r.name}; ajuste o workspace.yaml`,
+        hint: '.agents/workspace.yaml',
+      });
+      continue;
+    }
+
+    // 3. env-tracked: só verifica código de saída, NUNCA lê nem retorna conteúdo de .env
+    const envCheck = await spawnSimple(
+      gitBin,
+      ['ls-files', '--error-unmatch', '--', '.env'],
+      { cwd: repoDir, timeoutMs: GIT_TIMEOUT_MS, capture: false }
+    );
+    if (envCheck.code === 0) {
+      items.push({
+        id: 'env-tracked',
+        level: 'erro',
+        title: `Arquivo .env está versionado no git em ${r.name}`,
+        hint: 'Tire o .env do git e adicione ao .gitignore',
+      });
+    }
+
+    // 10. main-dirty
+    const changesNum = Number(r.changes) || 0;
+    if ((r.branch === 'main' || r.branch === 'master') && changesNum > 0) {
+      items.push({
+        id: 'main-dirty',
+        level: 'aviso',
+        title: `Repo ${r.name} está na ${r.branch} com ${changesNum} alteração(ões)`,
+        hint: 'Mude para uma branch feature/<slug>',
+      });
+    }
+  }
+
+  // 4. gitignore-env
+  const giPath = path.join(projectReal, '.gitignore');
+  let hasEnvIgnore = false;
+  if (fs.existsSync(giPath)) {
+    try {
+      const gi = fs.readFileSync(giPath, 'utf8');
+      hasEnvIgnore = /(^|\r?\n)\.env(\s|$|\.)/m.test(gi);
+    } catch {
+      // ignore
+    }
+  }
+  if (!hasEnvIgnore) {
+    items.push({
+      id: 'gitignore-env',
+      level: 'aviso',
+      title: 'O .gitignore do workspace não inclui .env',
+      hint: 'Adicione .env ao .gitignore da raiz',
+    });
+  }
+
+  // 5, 6, 7: docs-tech, docs-biz, docs-stale
+  const [ctxBus, ctxTech] = readWorkspaceContextDirs(projectReal);
+  const techIndex = path.resolve(projectReal, ctxTech, 'index.md');
+  const bizIndex = path.resolve(projectReal, ctxBus, 'index.md');
+
+  if (!fs.existsSync(techIndex)) {
+    items.push({
+      id: 'docs-tech',
+      level: 'aviso',
+      title: 'Documentação técnica ainda não foi gerada',
+      hint: '/docs-build-tech-docs',
+    });
+  } else {
+    try {
+      const st = fs.statSync(techIndex);
+      const ageDays = Math.floor((Date.now() - st.mtimeMs) / (1000 * 60 * 60 * 24));
+      if (ageDays > 90) {
+        items.push({
+          id: 'docs-stale',
+          level: 'aviso',
+          title: `Docs técnicos antigos (${ageDays} dias); regenere se a arquitetura mudou`,
+          hint: '/docs-build-tech-docs',
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!fs.existsSync(bizIndex)) {
+    items.push({
+      id: 'docs-biz',
+      level: 'aviso',
+      title: 'Documentação de negócio ainda não foi gerada',
+      hint: '/docs-build-business-docs',
+    });
+  }
+
+  // 8. liz-version
+  const instVer = readProjectInstalledVersion(projectReal);
+  const fwVer = readFrameworkVersion();
+  if (instVer && compareSemver(instVer, fwVer) < 0) {
+    items.push({
+      id: 'liz-version',
+      level: 'aviso',
+      title: `Versão do Liz desatualizada (v${instVer} → v${fwVer})`,
+      hint: 'Atualizar',
+    });
+  }
+
+  // 9. session-stale
+  const sessions = (infoData && infoData.sessions) || [];
+  for (const s of sessions) {
+    if (!s.lastCheckpoint) continue;
+    const ts = Date.parse(s.lastCheckpoint);
+    if (!Number.isNaN(ts)) {
+      const days = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+      if (days > 14) {
+        items.push({
+          id: 'session-stale',
+          level: 'aviso',
+          title: `Sessão ${s.slug} parada há ${days} dias`,
+          hint: '/catch-up',
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+async function listOpenPrs(projectReal, repoDir) {
+  const r = await spawnSimple(
+    'gh',
+    ['pr', 'list', '--state', 'open', '--json', 'number,title,url,headRefName', '--limit', '20'],
+    { cwd: repoDir, timeoutMs: GH_TIMEOUT_MS }
+  );
+  if (r.error) {
+    return {
+      unavailable: true,
+      reason: 'GitHub CLI (gh) não encontrado nesta máquina.',
+    };
+  }
+  if (r.timedOut) {
+    return {
+      unavailable: true,
+      reason: 'Tempo limite excedido ao consultar o GitHub.',
+    };
+  }
+  if (r.code !== 0) {
+    return {
+      unavailable: true,
+      reason: 'Não foi possível consultar PRs (verifique login no gh ou remoto GitHub).',
+    };
+  }
+  try {
+    const parsed = JSON.parse(r.stdout || '[]');
+    if (!Array.isArray(parsed)) return { prs: [] };
+    return {
+      prs: parsed.map((p) => ({
+        number: Number(p.number) || 0,
+        title: String(p.title || ''),
+        url: String(p.url || ''),
+        headRefName: String(p.headRefName || ''),
+      })),
+    };
+  } catch {
+    return { unavailable: true, reason: 'Resposta inesperada do gh.' };
+  }
+}
+
 function readAllowedDoc(registeredProjectPath, relFile) {
   if (!isSafePathInput(relFile)) {
     return { status: 400, error: 'Caminho de documento inválido.' };
@@ -385,10 +957,7 @@ function readAllowedDoc(registeredProjectPath, relFile) {
     return { status: 403, error: 'Apenas arquivos Markdown (.md) podem ser abertos.' };
   }
   const lowerRel = cleanRel.toLowerCase();
-  if (
-    lowerRel.includes('.env') ||
-    lowerRel.split('/').includes('.git')
-  ) {
+  if (lowerRel.includes('.env') || lowerRel.split('/').includes('.git')) {
     return { status: 403, error: 'Acesso negado a este arquivo.' };
   }
 
@@ -645,6 +1214,27 @@ async function handleApi(req, res, urlObj) {
     return sendJson(res, 200, { ok: true });
   }
 
+  if (req.method === 'GET' && pathname === '/api/guide') {
+    return sendJson(res, 200, buildGuideData());
+  }
+
+  if (req.method === 'GET' && pathname === '/api/guide/doc') {
+    const relFile = urlObj.searchParams.get('file') || '';
+    const result = readAllowedGuideDoc(relFile);
+    if (result.status !== 200) {
+      return sendJson(res, result.status, { error: result.error });
+    }
+    return sendJson(res, 200, result.data);
+  }
+
+  if (req.method === 'GET' && pathname === '/api/changelog') {
+    const from = (urlObj.searchParams.get('from') || '').trim();
+    if (from && !/^\d+\.\d+\.\d+$/.test(from)) {
+      return sendJson(res, 400, { error: 'Versão inválida no parâmetro from (esperado: X.Y.Z).' });
+    }
+    return sendJson(res, 200, getChangelogEntries(from || null));
+  }
+
   if (req.method === 'GET' && pathname === '/api/state') {
     try {
       const r = await runLizCommand(['list', '--tsv']);
@@ -668,6 +1258,12 @@ async function handleApi(req, res, urlObj) {
     if (!regPath) {
       return sendJson(res, 403, { error: 'Projeto não está no registro.' });
     }
+    let projectReal;
+    try {
+      projectReal = fs.realpathSync(regPath);
+    } catch {
+      return sendJson(res, 404, { error: 'Pasta do projeto não encontrada.' });
+    }
     try {
       const r = await runLizCommand(['info', regPath, '--tsv']);
       if (r.code !== 0) {
@@ -675,7 +1271,9 @@ async function handleApi(req, res, urlObj) {
           error: (r.stderr || r.stdout || 'Não foi possível ler os detalhes do projeto.').trim(),
         });
       }
-      return sendJson(res, 200, parseInfoTsv(r.stdout));
+      const infoData = parseInfoTsv(r.stdout);
+      const checkup = await checkupProject(projectReal, infoData);
+      return sendJson(res, 200, Object.assign(infoData, { checkup }));
     } catch (err) {
       return sendJson(res, 500, { error: err.message });
     }
@@ -714,6 +1312,41 @@ async function handleApi(req, res, urlObj) {
       body = await readJsonBody(req);
     } catch (e) {
       return sendJson(res, e.status || 400, { error: e.error || 'Requisição inválida.' });
+    }
+
+    if (pathname === '/api/prs') {
+      const regPath = findRegisteredPath(body.path);
+      if (!regPath) {
+        return sendJson(res, 403, { error: 'Projeto não está no registro.' });
+      }
+      if (typeof body.repo !== 'string' || !body.repo.trim() || body.repo.includes('\0')) {
+        return sendJson(res, 400, { error: 'Nome de repo inválido.' });
+      }
+      let projectReal;
+      try {
+        projectReal = fs.realpathSync(regPath);
+      } catch {
+        return sendJson(res, 404, { error: 'Pasta do projeto não encontrada.' });
+      }
+      try {
+        const r = await runLizCommand(['info', regPath, '--tsv']);
+        if (r.code !== 0) {
+          return sendJson(res, 404, { error: 'Não foi possível ler os repos do projeto.' });
+        }
+        const infoData = parseInfoTsv(r.stdout);
+        const match = infoData.repos.find((x) => x.name === body.repo.trim());
+        if (!match) {
+          return sendJson(res, 403, { error: 'Repo não encontrado no workspace.yaml deste projeto.' });
+        }
+        const repoDir = resolveRepoDir(projectReal, match);
+        if (!repoDir || !fs.existsSync(repoDir)) {
+          return sendJson(res, 404, { error: 'Pasta do repo não encontrada.' });
+        }
+        const prsResult = await listOpenPrs(projectReal, repoDir);
+        return sendJson(res, 200, prsResult);
+      } catch (err) {
+        return sendJson(res, 500, { error: err.message });
+      }
     }
 
     if (pathname === '/api/update') {
@@ -856,7 +1489,9 @@ function handleRequest(req, res) {
   if (urlObj.pathname === '/' || urlObj.pathname === '/index.html') {
     const t = urlObj.searchParams.get('t') || '';
     if (!safeTokenEqual(t)) {
-      return sendJson(res, 401, { error: 'Acesso não autorizado. Abra o painel pelo atalho ou comando liz.sh painel.' });
+      return sendJson(res, 401, {
+        error: 'Acesso não autorizado. Abra o painel pelo atalho ou comando liz.sh painel.',
+      });
     }
     try {
       const html = fs
@@ -1064,4 +1699,13 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 process.on('exit', releaseLock);
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  compareSemver,
+  parseFrontmatter,
+  parseChangelogFile,
+  checkupProject,
+};

@@ -4,13 +4,40 @@
   const tokenMeta = document.querySelector('meta[name="liz-token"]');
   const TOKEN = tokenMeta ? tokenMeta.getAttribute('content') || '' : '';
 
+  function readPref(key, fallback) {
+    try {
+      const v = localStorage.getItem('liz_' + key);
+      return v !== null ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function writePref(key, value) {
+    try {
+      localStorage.setItem('liz_' + key, value);
+    } catch {
+      // ignore
+    }
+  }
+
   const state = {
+    route: 'projetos',
     framework: { version: '0.0.0', path: '' },
     projects: [],
+    reloadingPaths: new Set(),
     busy: false,
+    filter: readPref('filter', 'all'),
+    sort: readPref('sort', 'name'),
+    search: '',
+    toolPrefix: readPref('toolPrefix', '/'),
+    guideData: null,
+    guideSearch: '',
+    guideDoc: null,
+    changelogData: null,
     detailProject: null,
     detailData: null,
-    detailTab: 'repos',
+    detailTab: 'checkup',
     currentDoc: null,
   };
 
@@ -22,26 +49,38 @@
     btnScan: document.getElementById('btn-scan'),
     btnRefresh: document.getElementById('btn-refresh'),
     btnRetry: document.getElementById('btn-retry'),
+    btnClearFilters: document.getElementById('btn-clear-filters'),
     banner: document.getElementById('banner'),
     jobPanel: document.getElementById('job-panel'),
     jobTitle: document.getElementById('job-title'),
     jobLog: document.getElementById('job-log'),
     btnCloseJob: document.getElementById('btn-close-job'),
+    viewProjetos: document.getElementById('view-projetos'),
+    viewGuia: document.getElementById('view-guia'),
+    viewNovidades: document.getElementById('view-novidades'),
+    summaryStrip: document.getElementById('summary-strip'),
+    searchProjects: document.getElementById('search-projects'),
+    sortProjects: document.getElementById('sort-projects'),
     summary: document.getElementById('summary'),
     loading: document.getElementById('state-loading'),
     errorBox: document.getElementById('state-error'),
     errorMsg: document.getElementById('error-message'),
     emptyBox: document.getElementById('state-empty'),
+    noResultsBox: document.getElementById('state-no-results'),
     list: document.getElementById('projects-list'),
+    guideRoot: document.getElementById('guide-root'),
+    changelogRoot: document.getElementById('changelog-root'),
     drawer: document.getElementById('detail-drawer'),
     drawerBackdrop: document.getElementById('drawer-backdrop'),
     detailTitle: document.getElementById('detail-title'),
     detailPath: document.getElementById('detail-path'),
     detailBody: document.getElementById('detail-body'),
+    checkupBadge: document.getElementById('checkup-badge'),
     btnCloseDetail: document.getElementById('btn-close-detail'),
     modal: document.getElementById('modal-dialog'),
     modalTitle: document.getElementById('modal-title'),
     modalMessage: document.getElementById('modal-message'),
+    modalRich: document.getElementById('modal-rich'),
     modalInputWrap: document.getElementById('modal-input-wrap'),
     modalInputLabel: document.getElementById('modal-input-label'),
     modalInput: document.getElementById('modal-input'),
@@ -82,6 +121,37 @@
     el.banner.classList.add('hidden');
   }
 
+  function formatCommand(cmdName) {
+    const clean = String(cmdName || '').replace(/^[/\$]/, '');
+    if (clean === 'liz') return 'liz';
+    return state.toolPrefix + clean;
+  }
+
+  async function copyText(text, btnEl) {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (btnEl) {
+        const orig = btnEl.textContent;
+        btnEl.textContent = 'Copiado!';
+        setTimeout(() => {
+          btnEl.textContent = orig;
+        }, 1500);
+      } else {
+        showBanner('Copiado: ' + text, 'ok');
+      }
+      return;
+    } catch {
+      await openModal({
+        title: 'Copiar comando',
+        message: 'Selecione e copie com Ctrl+C:',
+        input: true,
+        inputLabel: 'Comando',
+        inputDefault: text,
+        buttons: [{ label: 'Fechar', value: 'ok', cls: 'btn-primary' }],
+      });
+    }
+  }
+
   function setBusy(flag) {
     state.busy = flag;
     [el.btnCheck, el.btnUpdateAll, el.btnAdd, el.btnScan, el.btnRefresh].forEach((b) => {
@@ -96,6 +166,16 @@
     return new Promise((resolve) => {
       el.modalTitle.textContent = opts.title || 'Confirmar';
       el.modalMessage.textContent = opts.message || '';
+      el.modalMessage.classList.toggle('hidden', !opts.message);
+
+      el.modalRich.textContent = '';
+      if (opts.richNode) {
+        el.modalRich.appendChild(opts.richNode);
+        el.modalRich.classList.remove('hidden');
+      } else {
+        el.modalRich.classList.add('hidden');
+      }
+
       if (opts.input) {
         el.modalInputWrap.classList.remove('hidden');
         el.modalInputLabel.textContent = opts.inputLabel || 'Caminho da pasta';
@@ -126,7 +206,10 @@
         finish({ action: 'cancel', input: '' });
       };
       el.modal.showModal();
-      if (opts.input) el.modalInput.focus();
+      if (opts.input) {
+        el.modalInput.focus();
+        el.modalInput.select();
+      }
     });
   }
 
@@ -152,26 +235,6 @@
     return r.input;
   }
 
-  async function runJob(title, requestFn) {
-    if (state.busy) return;
-    hideBanner();
-    setBusy(true);
-    el.jobTitle.textContent = title;
-    el.jobLog.textContent = 'Iniciando...\n';
-    el.jobPanel.classList.remove('hidden');
-
-    try {
-      const { jobId } = await requestFn();
-      await pollJob(jobId, title);
-    } catch (err) {
-      showBanner('Falhou: ' + err.message, 'error');
-      el.jobLog.textContent += '\n❌ ' + err.message + '\n';
-    } finally {
-      setBusy(false);
-      await loadState();
-    }
-  }
-
   function lastNonEmptyLine(text) {
     const lines = String(text || '')
       .split(/\r?\n/)
@@ -188,15 +251,255 @@
       el.jobLog.scrollTop = el.jobLog.scrollHeight;
       if (data.status === 'done') {
         el.jobTitle.textContent = title + ' — concluído';
-        showBanner(title + ': concluído com sucesso.', 'ok');
-        return;
+        return { ok: true, log: data.log || '' };
       }
       if (data.status === 'failed') {
         el.jobTitle.textContent = title + ' — falhou';
-        showBanner('Falhou: ' + lastNonEmptyLine(data.log) + '. Veja o log.', 'error');
+        return { ok: false, log: data.log || '' };
+      }
+    }
+  }
+
+  // Fase 0: recarregar com indicação visível e confirmar versão antes do aviso verde
+  async function runJob(title, requestFn, opts) {
+    if (state.busy) return;
+    const options = opts || {};
+    hideBanner();
+    setBusy(true);
+    el.jobTitle.textContent = title;
+    el.jobLog.textContent = 'Iniciando...\n';
+    el.jobPanel.classList.remove('hidden');
+
+    let outcome = { ok: false, log: '' };
+    try {
+      const { jobId } = await requestFn();
+      outcome = await pollJob(jobId, title);
+    } catch (err) {
+      outcome = { ok: false, log: err.message };
+      el.jobLog.textContent += '\n❌ ' + err.message + '\n';
+    }
+
+    if (options.verifyPaths && options.verifyPaths.length > 0) {
+      options.verifyPaths.forEach((p) => state.reloadingPaths.add(p));
+    } else {
+      state.projects.forEach((p) => state.reloadingPaths.add(p.path));
+    }
+    showBanner('Atualizando a lista...', 'info');
+    renderProjects();
+
+    await loadState();
+    state.reloadingPaths.clear();
+    setBusy(false);
+    renderProjects();
+
+    if (!outcome.ok) {
+      showBanner('Falhou: ' + lastNonEmptyLine(outcome.log) + '. Veja o log.', 'error');
+      return;
+    }
+
+    if (options.verifyPaths && options.verifyPaths.length > 0) {
+      const stillOutdated = state.projects.filter(
+        (p) => options.verifyPaths.includes(p.path) && p.status === 'desatualizado'
+      );
+      if (stillOutdated.length > 0) {
+        showBanner(
+          'A atualização terminou, mas a versão do projeto não mudou. Veja o log.',
+          'warn'
+        );
         return;
       }
     }
+
+    showBanner(title + ': concluído com sucesso.', 'ok');
+  }
+
+  // --- Fase 2: Novidades antes de atualizar ---------------------------------
+  function compareSemver(a, b) {
+    const pa = String(a || '0.0.0').split('.').map((n) => Number(n) || 0);
+    const pb = String(b || '0.0.0').split('.').map((n) => Number(n) || 0);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    }
+    return 0;
+  }
+
+  function buildChangelogFragment(entries) {
+    const frag = document.createDocumentFragment();
+    entries.forEach((e) => {
+      const h = document.createElement('h4');
+      h.textContent = 'v' + e.version + ' — ' + e.date;
+      frag.appendChild(h);
+      frag.appendChild(renderSafeMarkdown(e.markdown, 'CHANGELOG.md'));
+    });
+    return frag;
+  }
+
+  async function showChangelogModal(fromVersion, allowUpdate) {
+    const query = fromVersion && /^\d+\.\d+\.\d+$/.test(fromVersion) ? '?from=' + encodeURIComponent(fromVersion) : '';
+    let data;
+    try {
+      data = await apiGet('/api/changelog' + query);
+    } catch {
+      return allowUpdate;
+    }
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      if (!allowUpdate) {
+        await openModal({
+          title: 'Novidades',
+          message: 'Não há entradas de novidades para esta faixa de versões.',
+          buttons: [{ label: 'Fechar', value: 'ok', cls: 'btn-primary' }],
+        });
+        return false;
+      }
+      return true;
+    }
+
+    const title = fromVersion
+      ? 'O que muda: v' + fromVersion + ' → v' + (data.current || state.framework.version)
+      : 'Novidades até v' + (data.current || state.framework.version);
+
+    const buttons = allowUpdate
+      ? [
+          { label: 'Cancelar', value: 'cancel' },
+          { label: 'Atualizar', value: 'ok', cls: 'btn-primary' },
+        ]
+      : [{ label: 'Fechar', value: 'ok', cls: 'btn-primary' }];
+
+    const r = await openModal({
+      title,
+      richNode: buildChangelogFragment(entries),
+      buttons,
+    });
+    return r.action === 'ok';
+  }
+
+  // --- Fase 4: Sugestão "O que fazer agora", resumo, filtros e ordenação ----
+  function suggestionForProject(p) {
+    if (p.status === 'ausente') {
+      return { text: 'Pasta não encontrada: remova da lista ou corrija o caminho', cmd: null };
+    }
+    if (p.status === 'desatualizado') {
+      return {
+        text: 'Atualizar o Liz (v' + (p.installedVersion || '?') + ' → v' + p.frameworkVersion + ')',
+        cmd: null,
+      };
+    }
+    if (p.sessionsOpen > 0) {
+      const label = p.sessionsOpen === 1 ? '1 sessão aberta' : p.sessionsOpen + ' sessões abertas';
+      return {
+        text: 'Continuar o trabalho: ' + formatCommand('engineer-work') + ' (' + label + ')',
+        cmd: 'engineer-work',
+      };
+    }
+    if (!p.docsTechnical) {
+      return {
+        text: 'Gerar a documentação técnica: ' + formatCommand('docs-build-tech-docs'),
+        cmd: 'docs-build-tech-docs',
+      };
+    }
+    if (!p.docsBusiness) {
+      return {
+        text: 'Gerar a de negócio: ' + formatCommand('docs-build-business-docs'),
+        cmd: 'docs-build-business-docs',
+      };
+    }
+    return {
+      text: 'Em dia. Próxima ideia: ' + formatCommand('product-collect'),
+      cmd: 'product-collect',
+    };
+  }
+
+  function applyFilterAndSort(projects) {
+    const q = state.search.trim().toLowerCase();
+    let list = projects.filter((p) => {
+      if (state.filter === 'outdated' && p.status !== 'desatualizado') return false;
+      if (state.filter === 'sessions' && p.sessionsOpen <= 0) return false;
+      if (state.filter === 'nodocs' && (p.docsTechnical || p.status === 'ausente')) return false;
+      if (state.filter === 'absent' && p.status !== 'ausente') return false;
+      if (q) {
+        const hay = (p.name + ' ' + p.path).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const statusOrder = {
+      desatualizado: 0,
+      ausente: 1,
+      'sem-liz': 2,
+      'sem-versao': 3,
+      'mais-novo': 4,
+      ok: 5,
+    };
+
+    list = list.slice().sort((a, b) => {
+      if (state.sort === 'status') {
+        const sa = statusOrder[a.status] ?? 9;
+        const sb = statusOrder[b.status] ?? 9;
+        if (sa !== sb) return sa - sb;
+      } else if (state.sort === 'sessions') {
+        if (b.sessionsOpen !== a.sessionsOpen) return b.sessionsOpen - a.sessionsOpen;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return list;
+  }
+
+  function renderSummaryStrip() {
+    const all = state.projects;
+    if (all.length === 0) {
+      el.summaryStrip.classList.add('hidden');
+      return;
+    }
+    el.summaryStrip.classList.remove('hidden');
+    el.summaryStrip.textContent = '';
+
+    const counts = {
+      all: all.length,
+      outdated: all.filter((p) => p.status === 'desatualizado').length,
+      sessions: all.filter((p) => p.sessionsOpen > 0).length,
+      nodocs: all.filter((p) => !p.docsTechnical && p.status !== 'ausente').length,
+      absent: all.filter((p) => p.status === 'ausente').length,
+    };
+
+    const cards = [
+      { key: 'all', label: 'Projetos', value: counts.all },
+      { key: 'outdated', label: 'Desatualizados', value: counts.outdated },
+      { key: 'sessions', label: 'Com sessão aberta', value: counts.sessions },
+      { key: 'nodocs', label: 'Sem docs técnicos', value: counts.nodocs },
+      { key: 'absent', label: 'Ausentes', value: counts.absent },
+    ];
+
+    cards.forEach((c) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'stat-card' + (state.filter === c.key ? ' active' : '');
+      const v = document.createElement('span');
+      v.className = 'stat-value';
+      v.textContent = String(c.value);
+      const l = document.createElement('span');
+      l.className = 'stat-label';
+      l.textContent = c.label;
+      btn.appendChild(v);
+      btn.appendChild(l);
+      btn.addEventListener('click', () => {
+        state.filter = c.key;
+        writePref('filter', c.key);
+        syncFilterUI();
+        renderProjects();
+      });
+      el.summaryStrip.appendChild(btn);
+    });
+  }
+
+  function syncFilterUI() {
+    document.querySelectorAll('.filter-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.filter === state.filter);
+    });
+    el.sortProjects.value = state.sort;
   }
 
   function renderProjects() {
@@ -214,19 +517,31 @@
       ' ' +
       (outdated === 1 ? 'desatualizado' : 'desatualizados');
 
+    renderSummaryStrip();
+    syncFilterUI();
+
     el.loading.classList.add('hidden');
     el.errorBox.classList.add('hidden');
     el.list.textContent = '';
 
     if (total === 0) {
       el.emptyBox.classList.remove('hidden');
+      el.noResultsBox.classList.add('hidden');
       return;
     }
     el.emptyBox.classList.add('hidden');
 
-    state.projects.forEach((p) => {
+    const visible = applyFilterAndSort(state.projects);
+    if (visible.length === 0) {
+      el.noResultsBox.classList.remove('hidden');
+      return;
+    }
+    el.noResultsBox.classList.add('hidden');
+
+    visible.forEach((p) => {
+      const isReloading = state.reloadingPaths.has(p.path);
       const card = document.createElement('article');
-      card.className = 'project-card';
+      card.className = 'project-card' + (isReloading ? ' reloading' : '');
 
       const top = document.createElement('div');
       top.className = 'card-top';
@@ -240,8 +555,8 @@
       h2.textContent = p.name;
 
       const chip = document.createElement('span');
-      chip.className = 'chip chip-' + p.status;
-      chip.textContent = p.status;
+      chip.className = 'chip chip-' + (isReloading ? 'info' : p.status);
+      chip.textContent = isReloading ? 'recarregando...' : p.status;
 
       titleRow.appendChild(h2);
       titleRow.appendChild(chip);
@@ -284,6 +599,21 @@
       pillTech.textContent = p.docsTechnical ? '✓ Técnica' : '— Técnica';
       meta.appendChild(pillTech);
 
+      const sug = suggestionForProject(p);
+      const sugBox = document.createElement('div');
+      sugBox.className = 'card-suggestion';
+      const sugText = document.createElement('span');
+      sugText.textContent = 'Próximo passo: ' + sug.text;
+      sugBox.appendChild(sugText);
+      if (sug.cmd) {
+        const btnCopy = document.createElement('button');
+        btnCopy.type = 'button';
+        btnCopy.className = 'btn btn-sm';
+        btnCopy.textContent = 'Copiar';
+        btnCopy.addEventListener('click', () => copyText(formatCommand(sug.cmd), btnCopy));
+        sugBox.appendChild(btnCopy);
+      }
+
       const actions = document.createElement('div');
       actions.className = 'card-actions';
 
@@ -293,10 +623,21 @@
         btnUpd.className = 'btn btn-primary btn-sm project-action-btn';
         btnUpd.textContent = 'Atualizar';
         btnUpd.disabled = state.busy;
-        btnUpd.addEventListener('click', () => {
-          runJob('Atualizando ' + p.name, () => apiPost('/api/update', { path: p.path }));
+        btnUpd.addEventListener('click', async () => {
+          const ok = await showChangelogModal(p.installedVersion, true);
+          if (!ok) return;
+          runJob('Atualizando ' + p.name, () => apiPost('/api/update', { path: p.path }), {
+            verifyPaths: [p.path],
+          });
         });
         actions.appendChild(btnUpd);
+
+        const btnDiff = document.createElement('button');
+        btnDiff.type = 'button';
+        btnDiff.className = 'btn btn-sm';
+        btnDiff.textContent = 'Ver o que mudou';
+        btnDiff.addEventListener('click', () => showChangelogModal(p.installedVersion, false));
+        actions.appendChild(btnDiff);
       }
 
       if (p.status !== 'ausente') {
@@ -351,6 +692,7 @@
 
       card.appendChild(top);
       card.appendChild(meta);
+      card.appendChild(sugBox);
       card.appendChild(actions);
       el.list.appendChild(card);
     });
@@ -373,19 +715,358 @@
     }
   }
 
+  // --- Fase 1: Aba Guia do Liz ----------------------------------------------
+  async function loadGuide() {
+    if (!state.guideData) {
+      el.guideRoot.textContent = 'Carregando guia do framework...';
+      try {
+        state.guideData = await apiGet('/api/guide');
+      } catch (err) {
+        el.guideRoot.textContent = 'Erro ao carregar o guia: ' + err.message;
+        return;
+      }
+    }
+    renderGuide();
+  }
+
+  async function openGuideDoc(relFile) {
+    el.guideRoot.textContent = 'Carregando documento...';
+    try {
+      const data = await apiGet('/api/guide/doc?file=' + encodeURIComponent(relFile));
+      state.guideDoc = { file: relFile, title: data.title, markdown: data.markdown };
+      renderGuide();
+    } catch (err) {
+      state.guideDoc = null;
+      el.guideRoot.textContent = 'Não foi possível abrir o documento: ' + err.message;
+    }
+  }
+
+  function renderGuide() {
+    el.guideRoot.textContent = '';
+    if (!state.guideData) return;
+
+    if (state.guideDoc) {
+      const box = document.createElement('section');
+      box.className = 'guide-section';
+      const bar = document.createElement('div');
+      bar.className = 'doc-viewer-bar';
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'btn btn-sm';
+      back.textContent = '← Voltar ao Guia';
+      back.addEventListener('click', () => {
+        state.guideDoc = null;
+        renderGuide();
+      });
+      const rel = document.createElement('span');
+      rel.className = 'doc-rel';
+      rel.textContent = state.guideDoc.file;
+      bar.appendChild(back);
+      bar.appendChild(rel);
+
+      const content = document.createElement('div');
+      content.className = 'md-content';
+      content.appendChild(renderSafeMarkdown(state.guideDoc.markdown, state.guideDoc.file));
+      box.appendChild(bar);
+      box.appendChild(content);
+      el.guideRoot.appendChild(box);
+      return;
+    }
+
+    // 1. Como começar
+    const qs = document.createElement('section');
+    qs.className = 'guide-section guide-quickstart';
+    const qsH = document.createElement('h2');
+    qsH.textContent = 'Como começar';
+    const qsP = document.createElement('p');
+    qsP.textContent =
+      '1. Abra a IA na pasta do projeto · 2. Rode ' +
+      formatCommand('warm-up') +
+      ' · 3. Escreva "liz" sempre que tiver dúvida sobre o próximo passo.';
+    const qsGlossary = document.createElement('p');
+    qsGlossary.className = 'muted';
+    qsGlossary.textContent =
+      'Glossário rápido: C4 é um jeito simples de desenhar a arquitetura em camadas (contexto e sistemas); ADR é um registro curto explicando por que uma decisão técnica foi tomada.';
+    qs.appendChild(qsH);
+    qs.appendChild(qsP);
+    qs.appendChild(qsGlossary);
+    el.guideRoot.appendChild(qs);
+
+    // 2. Ciclo em desenho
+    const cyc = document.createElement('section');
+    cyc.className = 'guide-section';
+    const cycH = document.createElement('h2');
+    cycH.textContent = 'Ciclo do Liz (clique em uma etapa para ir ao comando)';
+    cyc.appendChild(cycH);
+
+    ['Orientação', 'Produto', 'Engenharia'].forEach((grpName) => {
+      const steps = (state.guideData.cycle || []).filter((c) => c.group === grpName);
+      if (steps.length === 0) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'cycle-group';
+      const h3 = document.createElement('h3');
+      h3.className = 'cycle-group-title';
+      h3.textContent = grpName;
+      wrap.appendChild(h3);
+
+      const flow = document.createElement('div');
+      flow.className = 'cycle-flow';
+      steps.forEach((st, idx) => {
+        if (idx > 0) {
+          const arr = document.createElement('span');
+          arr.className = 'cycle-arrow';
+          arr.setAttribute('aria-hidden', 'true');
+          arr.textContent = '→';
+          flow.appendChild(arr);
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cycle-step' + (st.optional ? ' optional' : '');
+        btn.textContent =
+          formatCommand(st.command) + (st.optional ? ' (opcional)' : '');
+        btn.addEventListener('click', () => {
+          const target = document.getElementById('skill-card-' + st.command);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('highlight');
+            setTimeout(() => target.classList.remove('highlight'), 1800);
+          }
+        });
+        flow.appendChild(btn);
+      });
+      wrap.appendChild(flow);
+      cyc.appendChild(wrap);
+    });
+    el.guideRoot.appendChild(cyc);
+
+    // 3. Catálogo de comandos
+    const cat = document.createElement('section');
+    cat.className = 'guide-section';
+    const catH = document.createElement('h2');
+    catH.textContent = 'Catálogo de comandos';
+    cat.appendChild(catH);
+
+    const controls = document.createElement('div');
+    controls.className = 'guide-controls';
+
+    const toolGroup = document.createElement('div');
+    toolGroup.className = 'filter-group';
+    [
+      { prefix: '/', label: 'Claude Code e Antigravity (/)' },
+      { prefix: '$', label: 'Codex ($)' },
+    ].forEach((opt) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'filter-btn' + (state.toolPrefix === opt.prefix ? ' active' : '');
+      b.textContent = opt.label;
+      b.addEventListener('click', () => {
+        state.toolPrefix = opt.prefix;
+        writePref('toolPrefix', opt.prefix);
+        renderGuide();
+        renderProjects();
+      });
+      toolGroup.appendChild(b);
+    });
+
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'search-input';
+    search.placeholder = 'Filtrar comandos por nome ou descrição...';
+    search.value = state.guideSearch;
+    search.addEventListener('input', () => {
+      state.guideSearch = search.value;
+      renderCatalogList(grid);
+    });
+
+    controls.appendChild(toolGroup);
+    controls.appendChild(search);
+    cat.appendChild(controls);
+
+    const agyHint = document.createElement('p');
+    agyHint.className = 'muted';
+    agyHint.textContent = 'No Antigravity CLI (agy), peça pelo nome da skill (ex.: "rode a skill warm-up").';
+    cat.appendChild(agyHint);
+
+    const grid = document.createElement('div');
+    grid.className = 'catalog-grid';
+    renderCatalogList(grid);
+    cat.appendChild(grid);
+    el.guideRoot.appendChild(cat);
+
+    // 4. Especialistas
+    const agSec = document.createElement('section');
+    agSec.className = 'guide-section';
+    const agH = document.createElement('h2');
+    agH.textContent = 'Especialistas';
+    agSec.appendChild(agH);
+
+    const agGrid = document.createElement('div');
+    agGrid.className = 'catalog-grid';
+    (state.guideData.agents || []).forEach((a) => {
+      const card = document.createElement('div');
+      card.className = 'catalog-card';
+      const info = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'catalog-cmd';
+      title.textContent = '@' + a.name;
+      const desc = document.createElement('p');
+      desc.className = 'catalog-desc';
+      desc.textContent = a.description;
+      info.appendChild(title);
+      info.appendChild(desc);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm';
+      btn.textContent = 'Copiar @' + a.name;
+      btn.addEventListener('click', () => copyText('@' + a.name, btn));
+
+      card.appendChild(info);
+      card.appendChild(btn);
+      agGrid.appendChild(card);
+    });
+    agSec.appendChild(agGrid);
+    el.guideRoot.appendChild(agSec);
+
+    // 5. Base de conhecimento
+    const kbSec = document.createElement('section');
+    kbSec.className = 'guide-section';
+    const kbH = document.createElement('h2');
+    kbH.textContent = 'Base de conhecimento';
+    kbSec.appendChild(kbH);
+
+    const ul = document.createElement('ul');
+    ul.className = 'doc-list';
+    (state.guideData.knowledge || []).forEach((k) => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'doc-link-btn';
+      const t = document.createElement('span');
+      t.textContent = k.title;
+      const r = document.createElement('span');
+      r.className = 'doc-rel';
+      r.textContent = k.file;
+      btn.appendChild(t);
+      btn.appendChild(r);
+      btn.addEventListener('click', () => openGuideDoc(k.file));
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+    kbSec.appendChild(ul);
+    el.guideRoot.appendChild(kbSec);
+  }
+
+  function renderCatalogList(container) {
+    container.textContent = '';
+    const q = state.guideSearch.trim().toLowerCase();
+    const skills = (state.guideData.skills || []).filter((s) => {
+      if (!q) return true;
+      return (s.name + ' ' + s.group + ' ' + s.description).toLowerCase().includes(q);
+    });
+    if (skills.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = 'Nenhum comando encontrado para essa busca.';
+      container.appendChild(p);
+      return;
+    }
+    skills.forEach((s) => {
+      const card = document.createElement('div');
+      card.className = 'catalog-card';
+      card.id = 'skill-card-' + s.name;
+
+      const info = document.createElement('div');
+      const top = document.createElement('div');
+      top.className = 'card-title-row';
+      const cmd = document.createElement('span');
+      cmd.className = 'catalog-cmd';
+      cmd.textContent = formatCommand(s.name);
+      const grp = document.createElement('span');
+      grp.className = 'doc-pill';
+      grp.textContent = s.group;
+      top.appendChild(cmd);
+      top.appendChild(grp);
+
+      const desc = document.createElement('p');
+      desc.className = 'catalog-desc';
+      desc.textContent = s.description;
+      info.appendChild(top);
+      info.appendChild(desc);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm';
+      btn.textContent = 'Copiar comando';
+      btn.addEventListener('click', () => copyText(formatCommand(s.name), btn));
+
+      card.appendChild(info);
+      card.appendChild(btn);
+      container.appendChild(card);
+    });
+  }
+
+  // --- Fase 2: Aba Novidades ------------------------------------------------
+  async function loadChangelog() {
+    el.changelogRoot.textContent = 'Carregando histórico de novidades...';
+    try {
+      state.changelogData = await apiGet('/api/changelog');
+    } catch (err) {
+      el.changelogRoot.textContent = 'Erro ao carregar novidades: ' + err.message;
+      return;
+    }
+    el.changelogRoot.textContent = '';
+    const entries = (state.changelogData && state.changelogData.entries) || [];
+    if (entries.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'state-box';
+      p.textContent = 'Nenhuma entrada encontrada no CHANGELOG.';
+      el.changelogRoot.appendChild(p);
+      return;
+    }
+    entries.forEach((e) => {
+      const sec = document.createElement('article');
+      sec.className = 'changelog-entry';
+      const hdr = document.createElement('div');
+      hdr.className = 'changelog-entry-header';
+      const h2 = document.createElement('h2');
+      h2.textContent = 'v' + e.version;
+      const dt = document.createElement('span');
+      dt.className = 'muted';
+      dt.textContent = e.date;
+      hdr.appendChild(h2);
+      hdr.appendChild(dt);
+
+      const body = document.createElement('div');
+      body.className = 'md-content';
+      body.appendChild(renderSafeMarkdown(e.markdown, 'CHANGELOG.md'));
+
+      sec.appendChild(hdr);
+      sec.appendChild(body);
+      el.changelogRoot.appendChild(sec);
+    });
+  }
+
+  // --- Fase 3: Detalhes do projeto (Check-up, Repos+PRs, Sessões, Docs) -----
   async function openDetails(project) {
     state.detailProject = project;
     state.detailData = null;
-    state.detailTab = 'repos';
+    state.detailTab = 'checkup';
     state.currentDoc = null;
     el.detailTitle.textContent = project.name;
     el.detailPath.textContent = project.path;
-    el.detailBody.textContent = 'Carregando detalhes...';
+    el.checkupBadge.classList.add('hidden');
+    el.detailBody.textContent = 'Carregando detalhes e check-up...';
     updateTabs();
     el.drawer.classList.remove('hidden');
 
     try {
       state.detailData = await apiGet('/api/project?path=' + encodeURIComponent(project.path));
+      const pendCount = (state.detailData.checkup || []).filter((i) => i.level !== 'ok').length;
+      if (pendCount > 0) {
+        el.checkupBadge.textContent = String(pendCount);
+        el.checkupBadge.classList.remove('hidden');
+      }
       renderDetailTab();
     } catch (err) {
       el.detailBody.textContent = 'Não foi possível carregar detalhes: ' + err.message;
@@ -411,6 +1092,86 @@
     el.detailBody.textContent = '';
     if (!state.detailData) return;
 
+    if (state.detailTab === 'checkup') {
+      const items = state.detailData.checkup || [];
+      const header = document.createElement('p');
+      header.className = 'summary';
+      header.textContent =
+        items.length === 0
+          ? 'Nenhuma pendência encontrada neste projeto.'
+          : items.length + (items.length === 1 ? ' pendência encontrada' : ' pendências encontradas');
+      el.detailBody.appendChild(header);
+
+      if (items.length === 0) {
+        const okBox = document.createElement('div');
+        okBox.className = 'state-box';
+        okBox.textContent = '✅ Tudo certo! Nenhuma pendência.';
+        el.detailBody.appendChild(okBox);
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'checkup-list';
+      items.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'checkup-item';
+
+        const left = document.createElement('div');
+        const top = document.createElement('div');
+        top.className = 'card-title-row';
+
+        const lvl = document.createElement('span');
+        lvl.className = 'chip chip-' + item.level;
+        const icon = item.level === 'erro' ? '⛔ ' : item.level === 'aviso' ? '⚠️ ' : '✅ ';
+        lvl.textContent = icon + item.level;
+
+        const title = document.createElement('strong');
+        title.textContent = item.title;
+
+        top.appendChild(lvl);
+        top.appendChild(title);
+        left.appendChild(top);
+
+        if (item.hint) {
+          const hint = document.createElement('p');
+          hint.className = 'checkup-hint';
+          const isCmd = item.hint.startsWith('/');
+          hint.textContent = 'Como resolver: ' + (isCmd ? formatCommand(item.hint) : item.hint);
+          left.appendChild(hint);
+        }
+
+        row.appendChild(left);
+
+        if (item.hint && item.hint.startsWith('/')) {
+          const btnCopy = document.createElement('button');
+          btnCopy.type = 'button';
+          btnCopy.className = 'btn btn-sm';
+          btnCopy.textContent = 'Copiar';
+          btnCopy.addEventListener('click', () => copyText(formatCommand(item.hint), btnCopy));
+          row.appendChild(btnCopy);
+        } else if (item.id === 'liz-version' && state.detailProject) {
+          const btnUpd = document.createElement('button');
+          btnUpd.type = 'button';
+          btnUpd.className = 'btn btn-primary btn-sm';
+          btnUpd.textContent = 'Atualizar';
+          btnUpd.addEventListener('click', async () => {
+            const p = state.detailProject;
+            const ok = await showChangelogModal(p.installedVersion, true);
+            if (!ok) return;
+            closeDetails();
+            runJob('Atualizando ' + p.name, () => apiPost('/api/update', { path: p.path }), {
+              verifyPaths: [p.path],
+            });
+          });
+          row.appendChild(btnUpd);
+        }
+
+        list.appendChild(row);
+      });
+      el.detailBody.appendChild(list);
+      return;
+    }
+
     if (state.detailTab === 'repos') {
       const repos = state.detailData.repos || [];
       if (repos.length === 0) {
@@ -424,7 +1185,7 @@
       table.className = 'detail-table';
       const thead = document.createElement('thead');
       const hr = document.createElement('tr');
-      ['Repo', 'Papel', 'Stack', 'Branch', 'Alterações'].forEach((h) => {
+      ['Repo', 'Papel', 'Stack', 'Branch', 'Alterações', 'PRs'].forEach((h) => {
         const th = document.createElement('th');
         th.textContent = h;
         hr.appendChild(th);
@@ -435,13 +1196,89 @@
       const tbody = document.createElement('tbody');
       repos.forEach((r) => {
         const tr = document.createElement('tr');
-        [r.name, r.role || '-', r.stack || '-', r.branch || '?', r.changes === '' ? '-' : r.changes].forEach(
-          (v) => {
-            const td = document.createElement('td');
-            td.textContent = v;
-            tr.appendChild(td);
+        const tdName = document.createElement('td');
+        tdName.textContent = r.name;
+
+        const tdRole = document.createElement('td');
+        tdRole.textContent = r.role || '-';
+
+        const tdStack = document.createElement('td');
+        tdStack.textContent = r.stack || '-';
+
+        const tdBranch = document.createElement('td');
+        tdBranch.textContent = r.branch || '?';
+        const changesNum = Number(r.changes) || 0;
+        if ((r.branch === 'main' || r.branch === 'master') && changesNum > 0) {
+          const warn = document.createElement('div');
+          const chip = document.createElement('span');
+          chip.className = 'chip chip-aviso';
+          chip.textContent = 'Alterações direto na main';
+          warn.appendChild(chip);
+          tdBranch.appendChild(warn);
+        }
+
+        const tdChanges = document.createElement('td');
+        tdChanges.textContent = r.changes === '' ? '-' : r.changes;
+
+        const tdPrs = document.createElement('td');
+        const btnPr = document.createElement('button');
+        btnPr.type = 'button';
+        btnPr.className = 'btn btn-sm';
+        btnPr.textContent = 'Ver PRs abertos';
+        const prBox = document.createElement('div');
+        btnPr.addEventListener('click', async () => {
+          btnPr.disabled = true;
+          prBox.textContent = 'Consultando...';
+          try {
+            const res = await apiPost('/api/prs', {
+              path: state.detailProject.path,
+              repo: r.name,
+            });
+            prBox.textContent = '';
+            if (res.unavailable) {
+              const p = document.createElement('p');
+              p.className = 'muted';
+              p.textContent = res.reason || 'Indisponível.';
+              prBox.appendChild(p);
+            } else if (!res.prs || res.prs.length === 0) {
+              const p = document.createElement('p');
+              p.className = 'muted';
+              p.textContent = 'Nenhum PR aberto.';
+              prBox.appendChild(p);
+            } else {
+              const ul = document.createElement('ul');
+              ul.className = 'pr-list';
+              res.prs.forEach((pr) => {
+                const li = document.createElement('li');
+                if (typeof pr.url === 'string' && pr.url.startsWith('https://github.com/')) {
+                  const a = document.createElement('a');
+                  a.href = pr.url;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  a.textContent = '#' + pr.number + ' ' + pr.title;
+                  li.appendChild(a);
+                } else {
+                  li.textContent = '#' + pr.number + ' ' + pr.title;
+                }
+                ul.appendChild(li);
+              });
+              prBox.appendChild(ul);
+            }
+          } catch (err) {
+            prBox.textContent = 'Erro: ' + err.message;
+          } finally {
+            btnPr.disabled = false;
           }
-        );
+        });
+        tdPrs.appendChild(btnPr);
+        tdPrs.appendChild(prBox);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdRole);
+        tr.appendChild(tdStack);
+        tr.appendChild(tdBranch);
+        tr.appendChild(tdChanges);
+        tr.appendChild(tdPrs);
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -458,31 +1295,72 @@
         el.detailBody.appendChild(p);
         return;
       }
-      const table = document.createElement('table');
-      table.className = 'detail-table';
-      const thead = document.createElement('thead');
-      const hr = document.createElement('tr');
-      ['Sessão', 'Fase', 'Status', 'Próxima ação'].forEach((h) => {
-        const th = document.createElement('th');
-        th.textContent = h;
-        hr.appendChild(th);
-      });
-      thead.appendChild(hr);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
       sessions.forEach((s) => {
-        const tr = document.createElement('tr');
-        const faseTxt = s.phase ? (s.phaseTitle ? s.phase + ' — ' + s.phaseTitle : s.phase) : '-';
-        [s.slug, faseTxt, s.status || '-', s.nextAction || '-'].forEach((v) => {
-          const td = document.createElement('td');
-          td.textContent = v;
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
+        const card = document.createElement('div');
+        card.className = 'session-card';
+
+        const top = document.createElement('div');
+        top.className = 'card-title-row';
+        const slug = document.createElement('strong');
+        slug.textContent = s.slug;
+        const st = document.createElement('span');
+        st.className = 'chip chip-info';
+        st.textContent = s.status || 'aberta';
+        top.appendChild(slug);
+        top.appendChild(st);
+        card.appendChild(top);
+
+        if (s.phasesTotal && s.phasesTotal > 0) {
+          const done = s.phasesDone || 0;
+          const wrap = document.createElement('div');
+          wrap.className = 'progress-wrap';
+          const bar = document.createElement('progress');
+          bar.className = 'progress-native';
+          bar.value = Math.min(done, s.phasesTotal);
+          bar.max = s.phasesTotal;
+          const lbl = document.createElement('span');
+          lbl.className = 'muted';
+          lbl.textContent =
+            'Fase ' +
+            (s.phase || done) +
+            ' de ' +
+            s.phasesTotal +
+            ' (' +
+            done +
+            ' concluída(s))' +
+            (s.phaseTitle ? ' — ' + s.phaseTitle : '');
+          wrap.appendChild(bar);
+          wrap.appendChild(lbl);
+          card.appendChild(wrap);
+        } else if (s.phase || s.phaseTitle) {
+          const p = document.createElement('p');
+          p.className = 'muted';
+          p.textContent = 'Fase: ' + [s.phase, s.phaseTitle].filter(Boolean).join(' — ');
+          card.appendChild(p);
+        }
+
+        if (s.nextAction) {
+          const next = document.createElement('p');
+          next.textContent = 'Próxima ação: ' + s.nextAction;
+          card.appendChild(next);
+        }
+        if (s.blockedBy) {
+          const blk = document.createElement('p');
+          const chip = document.createElement('span');
+          chip.className = 'chip chip-erro';
+          chip.textContent = 'Bloqueado por: ' + s.blockedBy;
+          blk.appendChild(chip);
+          card.appendChild(blk);
+        }
+        if (s.lastCheckpoint) {
+          const chk = document.createElement('p');
+          chk.className = 'muted';
+          chk.textContent = 'Último checkpoint: ' + s.lastCheckpoint;
+          card.appendChild(chk);
+        }
+
+        el.detailBody.appendChild(card);
       });
-      table.appendChild(tbody);
-      el.detailBody.appendChild(table);
       return;
     }
 
@@ -494,8 +1372,16 @@
       const docs = state.detailData.docs || [];
       const groups = [
         { key: 'projeto', label: 'Projeto' },
-        { key: 'negocio', label: 'Negócio', hint: 'Ainda não gerado. Rode /docs-build-business-docs na IA deste projeto.' },
-        { key: 'tecnico', label: 'Técnica', hint: 'Ainda não gerado. Rode /docs-build-tech-docs na IA deste projeto.' },
+        {
+          key: 'negocio',
+          label: 'Negócio',
+          hint: 'Ainda não gerado. Rode /docs-build-business-docs na IA deste projeto.',
+        },
+        {
+          key: 'tecnico',
+          label: 'Técnica',
+          hint: 'Ainda não gerado. Rode /docs-build-tech-docs na IA deste projeto.',
+        },
         { key: 'specs', label: 'Specs' },
       ];
       groups.forEach((g) => {
@@ -795,12 +1681,59 @@
     el.detailBody.appendChild(content);
   }
 
+  // --- Roteamento por hash (#/projetos, #/guia, #/novidades) ----------------
+  function applyRoute() {
+    const raw = (window.location.hash || '#/projetos').replace(/^#\/?/, '').toLowerCase();
+    const route = raw === 'guia' || raw === 'novidades' ? raw : 'projetos';
+    state.route = route;
+
+    el.viewProjetos.classList.toggle('hidden', route !== 'projetos');
+    el.viewGuia.classList.toggle('hidden', route !== 'guia');
+    el.viewNovidades.classList.toggle('hidden', route !== 'novidades');
+
+    document.querySelectorAll('.nav-link').forEach((a) => {
+      a.classList.toggle('active', a.dataset.route === route);
+    });
+
+    if (route === 'guia') loadGuide();
+    else if (route === 'novidades') loadChangelog();
+  }
+
+  window.addEventListener('hashchange', applyRoute);
+
   // --- Eventos ---------------------------------------------------------------
   el.btnRefresh.addEventListener('click', loadState);
   el.btnRetry.addEventListener('click', loadState);
   el.btnCloseJob.addEventListener('click', () => el.jobPanel.classList.add('hidden'));
   el.btnCloseDetail.addEventListener('click', closeDetails);
   el.drawerBackdrop.addEventListener('click', closeDetails);
+
+  el.searchProjects.addEventListener('input', () => {
+    state.search = el.searchProjects.value;
+    renderProjects();
+  });
+
+  document.querySelectorAll('.filter-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      state.filter = b.dataset.filter;
+      writePref('filter', state.filter);
+      renderProjects();
+    });
+  });
+
+  el.sortProjects.addEventListener('change', () => {
+    state.sort = el.sortProjects.value;
+    writePref('sort', state.sort);
+    renderProjects();
+  });
+
+  el.btnClearFilters.addEventListener('click', () => {
+    state.filter = 'all';
+    state.search = '';
+    el.searchProjects.value = '';
+    writePref('filter', 'all');
+    renderProjects();
+  });
 
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && !el.drawer.classList.contains('hidden')) {
@@ -822,17 +1755,26 @@
   });
 
   el.btnUpdateAll.addEventListener('click', async () => {
-    const outdated = state.projects.filter((p) => p.status === 'desatualizado').length;
-    const r = await openModal({
-      title: 'Atualizar todos os projetos',
-      message: 'Atualizar ' + outdated + ' projeto(s) desatualizado(s) para v' + state.framework.version + '?',
-      buttons: [
-        { label: 'Cancelar', value: 'cancel' },
-        { label: 'Atualizar todos', value: 'ok', cls: 'btn-primary' },
-      ],
+    const outdatedList = state.projects.filter((p) => p.status === 'desatualizado');
+    if (outdatedList.length === 0) return;
+
+    let minVer = null;
+    outdatedList.forEach((p) => {
+      if (p.installedVersion && /^\d+\.\d+\.\d+$/.test(p.installedVersion)) {
+        if (!minVer || compareSemver(p.installedVersion, minVer) < 0) {
+          minVer = p.installedVersion;
+        }
+      }
     });
-    if (r.action !== 'ok') return;
-    runJob('Atualizando todos os projetos', () => apiPost('/api/update', { all: true }));
+
+    const ok = await showChangelogModal(minVer, true);
+    if (!ok) return;
+
+    runJob(
+      'Atualizando todos os projetos',
+      () => apiPost('/api/update', { all: true }),
+      { verifyPaths: outdatedList.map((p) => p.path) }
+    );
   });
 
   el.btnAdd.addEventListener('click', async () => {
@@ -873,5 +1815,6 @@
   sendPing();
   setInterval(sendPing, 5000);
 
+  applyRoute();
   loadState();
 })();

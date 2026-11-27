@@ -9,10 +9,17 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-icon" aria-hidden="true">🦊</span>
-      <h1>Liz</h1>
-      <span id="fw-version" class="badge-version">v...</span>
+    <div class="brand-group">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">🦊</span>
+        <h1>Liz</h1>
+        <span id="fw-version" class="badge-version">v...</span>
+      </div>
+      <nav class="main-nav" aria-label="Seções do painel">
+        <a href="#/projetos" class="nav-link active" data-route="projetos">Projetos</a>
+        <a href="#/guia" class="nav-link" data-route="guia">Guia</a>
+        <a href="#/novidades" class="nav-link" data-route="novidades">Novidades</a>
+      </nav>
     </div>
     <nav class="actions" aria-label="Ações principais">
       <button id="btn-check" class="btn" type="button">Verificar novidades</button>
@@ -33,24 +40,60 @@
       <pre id="job-log" class="job-log"></pre>
     </section>
 
-    <div class="summary-row">
+    <!-- ABA PROJETOS -->
+    <section id="view-projetos" class="view">
+      <div id="summary-strip" class="summary-strip hidden" aria-label="Resumo rápido"></div>
+
+      <div class="toolbar">
+        <input id="search-projects" class="search-input" type="search" placeholder="Buscar por nome ou caminho..." aria-label="Buscar projetos">
+        <div class="filter-group" role="group" aria-label="Filtrar projetos">
+          <button class="filter-btn active" data-filter="all" type="button">Todos</button>
+          <button class="filter-btn" data-filter="outdated" type="button">Desatualizados</button>
+          <button class="filter-btn" data-filter="sessions" type="button">Com sessão aberta</button>
+          <button class="filter-btn" data-filter="nodocs" type="button">Sem docs</button>
+        </div>
+        <div class="toolbar-right">
+          <label class="sr-only" for="sort-projects">Ordenar por</label>
+          <select id="sort-projects" class="select-input" aria-label="Ordenar projetos">
+            <option value="name">Ordenar: Nome</option>
+            <option value="status">Ordenar: Status</option>
+            <option value="sessions">Ordenar: Mais sessões</option>
+          </select>
+          <button id="btn-refresh" class="btn btn-sm" type="button">Recarregar</button>
+        </div>
+      </div>
+
       <p id="summary" class="summary">Carregando projetos...</p>
-      <button id="btn-refresh" class="btn btn-sm" type="button">Recarregar</button>
-    </div>
 
-    <section id="state-loading" class="state-box">Carregando projetos registrados...</section>
+      <section id="state-loading" class="state-box">Carregando projetos registrados...</section>
 
-    <section id="state-error" class="state-box state-error hidden">
-      <p id="error-message">Não foi possível comunicar com o servidor local.</p>
-      <button id="btn-retry" class="btn btn-primary" type="button">Tentar de novo</button>
+      <section id="state-error" class="state-box state-error hidden">
+        <p id="error-message">Não foi possível comunicar com o servidor local.</p>
+        <button id="btn-retry" class="btn btn-primary" type="button">Tentar de novo</button>
+      </section>
+
+      <section id="state-empty" class="state-box hidden">
+        <p><strong>Nenhum projeto ainda.</strong></p>
+        <p>Use <em>Procurar projetos</em> ou <em>Adicionar projeto</em> para começar.</p>
+      </section>
+
+      <section id="state-no-results" class="state-box hidden">
+        <p><strong>Nenhum projeto corresponde aos filtros atuais.</strong></p>
+        <button id="btn-clear-filters" class="btn" type="button">Limpar filtros</button>
+      </section>
+
+      <section id="projects-list" class="projects-list" aria-label="Lista de projetos"></section>
     </section>
 
-    <section id="state-empty" class="state-box hidden">
-      <p><strong>Nenhum projeto ainda.</strong></p>
-      <p>Use <em>Procurar projetos</em> ou <em>Adicionar projeto</em> para começar.</p>
+    <!-- ABA GUIA -->
+    <section id="view-guia" class="view hidden">
+      <div id="guide-root"></div>
     </section>
 
-    <section id="projects-list" class="projects-list" aria-label="Lista de projetos"></section>
+    <!-- ABA NOVIDADES -->
+    <section id="view-novidades" class="view hidden">
+      <div id="changelog-root"></div>
+    </section>
   </main>
 
   <aside id="detail-drawer" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="detail-title">
@@ -65,7 +108,8 @@
       </div>
 
       <div class="tabs" role="tablist">
-        <button class="tab active" data-tab="repos" role="tab" aria-selected="true" type="button">Repos</button>
+        <button class="tab active" data-tab="checkup" role="tab" aria-selected="true" type="button">Check-up <span id="checkup-badge" class="tab-badge hidden">0</span></button>
+        <button class="tab" data-tab="repos" role="tab" aria-selected="false" type="button">Repos</button>
         <button class="tab" data-tab="sessions" role="tab" aria-selected="false" type="button">Sessões</button>
         <button class="tab" data-tab="docs" role="tab" aria-selected="false" type="button">Documentos</button>
       </div>
@@ -78,6 +122,7 @@
     <form method="dialog" class="modal-box" id="modal-form">
       <h3 id="modal-title">Confirmar</h3>
       <p id="modal-message"></p>
+      <div id="modal-rich" class="modal-rich md-content hidden"></div>
       <div id="modal-input-wrap" class="modal-input-wrap hidden">
         <label for="modal-input" id="modal-input-label">Caminho da pasta</label>
         <input id="modal-input" type="text" autocomplete="off">

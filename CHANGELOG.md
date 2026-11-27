@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-26
+
+Painel v2: Guia do Liz, novidades antes de atualizar, check-up do projeto e tela inicial com filtros.
+
+- **Correção pós-atualização:** antes o aviso verde aparecia assim que o job terminava, enquanto a lista ainda recarregava pelo `liz.sh list --tsv` sem indicação visual. Agora o painel exibe estado "Atualizando a lista..." com card recarregando, só mostra o aviso verde após confirmar a nova versão e exibe aviso amarelo se a versão do projeto não mudou.
+- **Aba Guia (`#/guia`):** ciclo visual do Liz (Produto e Engenharia), catálogo de comandos com busca, cópia em 1 clique e seletor de prefixo (`/` para Claude Code/Antigravity, `$` para Codex), lista de especialistas e leitura da base de conhecimento direto dos arquivos do framework (`GET /api/guide` e `GET /api/guide/doc`).
+- **Novidades (`#/novidades` e modal pré-atualização):** `GET /api/changelog` mostra o que mudou entre a versão instalada e a atual antes de atualizar (um projeto ou todos) e no botão "Ver o que mudou".
+- **Detalhes mais ricos:** `liz.sh info --tsv` ganha 3 colunas compatíveis no fim de `#sessions` (`phases_total`, `phases_done`, `blocked_by`) com barra de progresso na UI; aba **Check-up** (10 verificações somente leitura, sem nunca abrir `.env`); destaque em repos com alterações direto na `main`/`master`; botão opcional "Ver PRs abertos" (`POST /api/prs` via `gh`).
+- **Tela inicial útil:** faixa de resumo clicável, busca por nome/caminho, filtros, ordenação persistida em `localStorage` e sugestão "Próximo passo" por projeto com botão Copiar.
+- **Segurança:** novas rotas cobertas em `painel/teste-seguranca.sh` (incluindo checagem contra vazamento de `.env`).
+
 ## 0.4.0 — 2026-11-26
 
 Estimativa e registro de consumo de tokens.

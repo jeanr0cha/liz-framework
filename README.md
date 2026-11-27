@@ -173,7 +173,7 @@ ser editadas à mão:
 
 ## Painel
 
-Para acompanhar todos os projetos onde o Liz está instalado (versão, aviso de desatualizado, repos, sessões abertas e documentos) e atualizar com um clique, tudo rodando **somente na sua máquina**:
+Para acompanhar todos os projetos onde o Liz está instalado (versão, aviso de desatualizado, check-up de pendências, repos com alerta de alterações na `main` e PRs abertos, sessões com progresso e documentos), consultar o **Guia** do framework (ciclo, catálogo de comandos com cópia em 1 clique, especialistas e base de conhecimento), ver **Novidades** antes de atualizar e filtrar/ordenar a lista com sugestão de próximo passo — tudo rodando **somente na sua máquina**:
 
 ```bash
 bash liz.sh atalho   # Windows: cria o atalho "Liz" na Área de Trabalho e no Menu Iniciar

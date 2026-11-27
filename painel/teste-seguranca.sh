@@ -37,7 +37,8 @@ mkdir -p "$LIZ_HOME" "$PROJ/.agents" "$PROJ/docs/specs" "$PROJ/docs/technical-co
 printf 'framework: liz-framework\nversion: 0.2.0\ntools: claude\n' > "$PROJ/.agents/.liz-version"
 printf '# Projeto Teste\n\nTexto normal.\n' > "$PROJ/AGENTS.md"
 printf '# Spec\n\n<script>alert(1)</script>\n' > "$PROJ/docs/specs/spec.md"
-printf 'SEGREDO=123\n' > "$PROJ/.env"
+SENTINEL="LIZ_SENTINEL_NAO_VAZAR_847291"
+printf 'SEGREDO=%s\n' "$SENTINEL" > "$PROJ/.env"
 printf '# Fora\n' > "$OUTSIDE"
 
 if command -v cygpath >/dev/null 2>&1; then
@@ -113,6 +114,27 @@ check_status "S8 GET /api/doc docs/specs/spec.md válido" 200 "$(curl -s -o /dev
 check_status "S8 GET /api/doc traversal ../.env" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/doc?path=$ENC_PROJ&file=../../.env")"
 check_status "S8 GET /api/doc .env direto" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/doc?path=$ENC_PROJ&file=.env")"
 check_status "S8 GET /api/doc traversal ../fora.md" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/doc?path=$ENC_PROJ&file=../fora.md")"
+
+# Rotas v2: /api/guide, /api/guide/doc, /api/changelog, /api/prs e sem vazamento de .env
+check_status "V2 GET /api/guide sem token" 401 "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/guide")"
+check_status "V2 GET /api/guide Host inválido" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.com' -H "X-Liz-Token: $TOKEN" "$BASE/api/guide")"
+check_status "V2 GET /api/guide válido" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/guide")"
+check_status "V2 GET /api/guide/doc README.md" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/guide/doc?file=README.md")"
+check_status "V2 GET /api/guide/doc ../install.sh" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/guide/doc?file=../install.sh")"
+check_status "V2 GET /api/guide/doc fora da lista (.agents/utils)" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/guide/doc?file=.agents/utils/forge/README.md")"
+check_status "V2 GET /api/changelog sem token" 401 "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/changelog")"
+check_status "V2 GET /api/changelog from inválido" 400 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/changelog?from=abc")"
+check_status "V2 GET /api/changelog válido" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Liz-Token: $TOKEN" "$BASE/api/changelog")"
+check_status "V2 POST /api/prs sem token" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: $BASE" -H 'Content-Type: application/json' -d '{"path":"x","repo":"r"}' "$BASE/api/prs")"
+check_status "V2 POST /api/prs Origin inválido" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Origin: http://evil.com' -H "X-Liz-Token: $TOKEN" -H 'Content-Type: application/json' -d '{"path":"x","repo":"r"}' "$BASE/api/prs")"
+check_status "V2 POST /api/prs projeto não registrado" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: $BASE" -H "X-Liz-Token: $TOKEN" -H 'Content-Type: application/json' -d '{"path":"/nao/existe","repo":"r"}' "$BASE/api/prs")"
+
+PROJ_BODY="$(curl -s -H "X-Liz-Token: $TOKEN" "$BASE/api/project?path=$ENC_PROJ")"
+if printf '%s' "$PROJ_BODY" | grep -q "$SENTINEL" || grep -q "$SENTINEL" "$OUT_LOG"; then
+  fail "S13 conteúdo do .env apareceu na resposta ou no log"
+else
+  pass "S13 check-up nunca expõe conteúdo do .env"
+fi
 
 # S9: verificação estática de funções perigosas
 if grep -rn -E "shell:[[:space:]]*true|execSync|exec\(|eval\(|new Function|innerHTML" "$FW/painel/server.js" "$FW/painel/public/app.js"; then

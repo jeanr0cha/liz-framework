@@ -4,7 +4,7 @@
 #
 # Uso:
 #   liz.sh list [--tsv]
-#   liz.sh info <caminho> [--tsv]
+#   liz.sh info <caminho> [--tsv]   (#repos: 6 cols; #sessions: 9 cols; #docs: 3 cols)
 #   liz.sh scan <pasta> [--depth N]
 #   liz.sh add <caminho>
 #   liz.sh remove <caminho>
@@ -351,7 +351,7 @@ cmd_info() {
 
   local sessions_lines=()
   if [ -d "$pdir/.agents/sessions" ]; then
-    local sd bn state_file s_phase s_title s_status s_next s_chk
+    local sd bn state_file plan_file s_phase s_title s_status s_next s_chk s_blocked p_total p_done
     while IFS= read -r sd; do
       [ -d "$sd" ] || continue
       bn="$(basename "$sd")"
@@ -359,7 +359,9 @@ cmd_info() {
         archived|_*|.*) continue ;;
       esac
       state_file="$sd/STATE.md"
-      s_phase=""; s_title=""; s_status=""; s_next=""; s_chk=""
+      plan_file="$sd/plan.md"
+      s_phase=""; s_title=""; s_status=""; s_next=""; s_chk=""; s_blocked=""
+      p_total=""; p_done=""
       if [ -f "$state_file" ]; then
         local parsed
         parsed="$(awk '
@@ -374,7 +376,9 @@ cmd_info() {
             vals[k] = trim(v)
           }
           END {
-            printf "%s\t%s\t%s\t%s\t%s\n", vals["phase"], vals["phase_title"], vals["status"], vals["next_action"], vals["last_checkpoint"]
+            b = vals["blocked_by"]
+            if (tolower(b) == "none") b = ""
+            printf "%s\t%s\t%s\t%s\t%s\t%s\n", vals["phase"], vals["phase_title"], vals["status"], vals["next_action"], vals["last_checkpoint"], b
           }
         ' "$state_file" 2>/dev/null || true)"
         s_phase="$(tsv_field "$parsed" 1)"
@@ -382,10 +386,25 @@ cmd_info() {
         s_status="$(tsv_field "$parsed" 3)"
         s_next="$(tsv_field "$parsed" 4)"
         s_chk="$(tsv_field "$parsed" 5)"
+        s_blocked="$(tsv_field "$parsed" 6)"
       fi
-      sessions_lines+=("$(printf '%s\t%s\t%s\t%s\t%s\t%s' \
+      if [ -f "$plan_file" ]; then
+        local plan_counts
+        plan_counts="$(awk '
+          { sub(/\r$/, "") }
+          /^##[ \t]+FASE[ \t]+[0-9]+/ {
+            tot++
+            if ($0 ~ /\[DONE\][ \t]*$/) done++
+          }
+          END { printf "%d\t%d\n", tot+0, done+0 }
+        ' "$plan_file" 2>/dev/null || true)"
+        p_total="$(tsv_field "$plan_counts" 1)"
+        p_done="$(tsv_field "$plan_counts" 2)"
+      fi
+      sessions_lines+=("$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
         "$(clean_field "$bn")" "$(clean_field "$s_phase")" "$(clean_field "$s_title")" \
-        "$(clean_field "$s_status")" "$(clean_field "$s_next")" "$(clean_field "$s_chk")")")
+        "$(clean_field "$s_status")" "$(clean_field "$s_next")" "$(clean_field "$s_chk")" \
+        "$(clean_field "$p_total")" "$(clean_field "$p_done")" "$(clean_field "$s_blocked")")")
     done < <(find "$pdir/.agents/sessions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
   fi
 
