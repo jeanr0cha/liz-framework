@@ -221,6 +221,14 @@ if [ "$STORY_POINTS" != "" ]; then
 fi
 ```
 
+### **4.1 Estimativa de consumo (IA)**
+
+Com os story points definidos, acrescente à task (ou à spec em `docs/specs/<slug>.md`) a seção
+**"Estimativa de consumo (IA)"** com a saída de `tokens.sh estimate --points <N> --repos <nº de repos
+afetados> --tool <ferramenta em que você roda>`, como em `.agents/shared/token-estimation.md`. É uma
+**faixa, não promessa**. Sem story points ainda: escreva "defina os story points para estimar". Com
+gerenciador de tarefas ligado, inclua também a linha `--plain` na descrição.
+
 ### **5. Resultado e Links**
 ```bash
 if [ "$TASK_ID" != "" ] && [ "$TASK_ID" != "null" ]; then
